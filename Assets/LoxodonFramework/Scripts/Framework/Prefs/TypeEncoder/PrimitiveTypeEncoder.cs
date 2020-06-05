@@ -1,4 +1,28 @@
-﻿using System;
+﻿/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
+using System;
 
 namespace Loxodon.Framework.Prefs
 {
@@ -82,33 +106,20 @@ namespace Loxodon.Framework.Prefs
                 case TypeCode.String:
                     return input;
                 case TypeCode.Boolean:
-                    return Convert.ToBoolean(input);
                 case TypeCode.SByte:
-                    return Convert.ToSByte(input);
                 case TypeCode.Byte:
-                    return Convert.ToByte(input);
                 case TypeCode.Int16:
-                    return Convert.ToInt16(input);
                 case TypeCode.UInt16:
-                    return Convert.ToUInt16(input);
                 case TypeCode.Int32:
-                    return Convert.ToInt32(input);
                 case TypeCode.UInt32:
-                    return Convert.ToUInt32(input);
                 case TypeCode.Int64:
-                    return Convert.ToInt64(input);
                 case TypeCode.UInt64:
-                    return Convert.ToUInt64(input);
                 case TypeCode.Char:
-                    return Convert.ToChar(input);
                 case TypeCode.Single:
-                    return Convert.ToSingle(input);
                 case TypeCode.Double:
-                    return Convert.ToDouble(input);
                 case TypeCode.Decimal:
-                    return Convert.ToDecimal(input);
                 case TypeCode.DateTime:
-                    return Convert.ToDateTime(input);
+                    return Convert.ChangeType(input, type);
             }
 
             throw new NotSupportedException();

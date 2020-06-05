@@ -1,4 +1,28 @@
-﻿using System;
+﻿/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
+using System;
 using System.Reflection;
 using System.Collections;
 using System.Collections.Generic;
@@ -33,7 +57,7 @@ namespace Loxodon.Framework.Binding.Paths
             get { return this.nodes.Count; }
         }
 
-        public bool IsStatic { get { return nodes.Exists(n => n is TypeNode); } }
+        public bool IsStatic { get { return nodes.Exists(n => n.IsStatic); } }
 
         public List<IPathNode> ToList()
         {
@@ -153,23 +177,40 @@ namespace Loxodon.Framework.Binding.Paths
 
     public interface IPathNode
     {
+        bool IsStatic { get; }
+
         void AppendTo(StringBuilder output);
     }
 
     [Serializable]
     public class MemberNode : IPathNode
     {
-        private string name;
-        private MemberInfo memberInfo;
-        public MemberNode(string name)
+        private readonly MemberInfo memberInfo;
+        private readonly string name;
+        private readonly Type type;
+        private readonly bool isStatic;
+        public MemberNode(string name) : this(null, name, false)
         {
-            this.name = name;
         }
 
-        public MemberNode(MemberInfo memberInfo) : this(memberInfo.Name)
+        public MemberNode(Type type, string name, bool isStatic)
+        {
+            this.name = name;
+            this.type = type;
+            this.isStatic = isStatic;
+        }
+
+        public MemberNode(MemberInfo memberInfo)
         {
             this.memberInfo = memberInfo;
+            this.name = memberInfo.Name;
+            this.type = memberInfo.DeclaringType;
+            this.isStatic = memberInfo.IsStatic();
         }
+
+        public bool IsStatic { get { return this.isStatic; } }
+
+        public Type Type { get { return this.type; } }
 
         public string Name { get { return this.name; } }
 
@@ -179,44 +220,14 @@ namespace Loxodon.Framework.Binding.Paths
         {
             if (output.Length > 0)
                 output.Append(".");
+            if (IsStatic)
+                output.Append(this.type.FullName).Append(".");
             output.Append(this.Name);
         }
 
         public override string ToString()
         {
             return "MemberNode:" + (this.Name == null ? "null" : this.Name);
-        }
-    }
-
-    [Serializable]
-    public class TypeNode : IPathNode
-    {
-        private Type type;
-        public TypeNode(string name)
-        {
-            this.Name = name;
-        }
-
-        public TypeNode(Type type)
-        {
-            this.Name = type.FullName;
-            this.type = type;
-        }
-
-        public Type Type { get { return type; } }
-
-        public string Name { get; private set; }
-
-        public void AppendTo(StringBuilder output)
-        {
-            if (output.Length > 0)
-                output.Append(".");
-            output.Append(this.Name);
-        }
-
-        public override string ToString()
-        {
-            return "TypeNode:" + (this.Name == null ? "null" : this.Name);
         }
     }
 
@@ -228,6 +239,8 @@ namespace Loxodon.Framework.Binding.Paths
         {
             this._value = value;
         }
+
+        public bool IsStatic { get { return false; } }
 
         public object Value
         {

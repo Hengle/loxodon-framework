@@ -1,9 +1,30 @@
-﻿using System;
+﻿/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
+using System;
 using System.Collections.Generic;
 using System.Threading;
-#if NETFX_CORE
-using System.Threading.Tasks;
-#endif
 
 using Loxodon.Framework.Asynchronous;
 
@@ -26,8 +47,7 @@ namespace Loxodon.Framework.Execution
                 return;
 
             this.running = true;
-#if NETFX_CORE
-            Task.Factory.StartNew(() =>
+            Executors.RunAsyncNoReturn(() =>
             {
                 IDelayTask task = null;
                 while (running)
@@ -53,34 +73,6 @@ namespace Loxodon.Framework.Execution
                     task.Run();
                 }
             });
-#else
-            ThreadPool.QueueUserWorkItem(state =>
-            {
-                IDelayTask task = null;
-                while (running)
-                {
-                    lock (_lock)
-                    {
-                        if (queue.Count <= 0)
-                        {
-                            Monitor.Wait(_lock);
-                            continue;
-                        }
-
-                        task = queue[0];
-                        if (task.Delay.Ticks > 0)
-                        {
-                            Monitor.Wait(_lock, task.Delay);
-                            continue;
-                        }
-
-                        queue.RemoveAt(0);
-                    }
-
-                    task.Run();
-                }
-            });
-#endif
         }
 
         public void Stop()
@@ -178,6 +170,11 @@ namespace Loxodon.Framework.Execution
             return new FixedDelayDelayTask(this, command, initialDelay, delay);
         }
 
+        public virtual void Dispose()
+        {
+            this.Stop();
+        }
+
         interface IDelayTask : Asynchronous.IAsyncResult
         {
             TimeSpan Delay { get; }
@@ -243,11 +240,7 @@ namespace Loxodon.Framework.Execution
             {
                 try
                 {
-#if NETFX_CORE
-                    Task.Factory.StartNew(wrappedAction);
-#else
-                    ThreadPool.QueueUserWorkItem(state=>this.wrappedAction());
-#endif
+                    Executors.RunAsyncNoReturn(() => this.wrappedAction());
                 }
                 catch (Exception)
                 {
@@ -280,7 +273,8 @@ namespace Loxodon.Framework.Execution
                         {
                             this.SetCancelled();
                         }
-                        else {
+                        else
+                        {
                             this.SetResult(command());
                         }
                     }
@@ -311,11 +305,7 @@ namespace Loxodon.Framework.Execution
             {
                 try
                 {
-#if NETFX_CORE
-                    Task.Factory.StartNew(wrappedAction);
-#else
-                    ThreadPool.QueueUserWorkItem(state=>this.wrappedAction());
-#endif
+                    Executors.RunAsyncNoReturn(() => this.wrappedAction());
                 }
                 catch (Exception)
                 {
@@ -350,7 +340,8 @@ namespace Loxodon.Framework.Execution
                         {
                             this.SetCancelled();
                         }
-                        else {
+                        else
+                        {
                             Interlocked.Increment(ref count);
                             //count++;
                             this.executor.Add(this);
@@ -381,11 +372,7 @@ namespace Loxodon.Framework.Execution
             {
                 try
                 {
-#if NETFX_CORE
-                    Task.Factory.StartNew(wrappedAction);
-#else
-                    ThreadPool.QueueUserWorkItem(state=>this.wrappedAction());
-#endif
+                    Executors.RunAsyncNoReturn(() => this.wrappedAction());
                 }
                 catch (Exception)
                 {
@@ -395,19 +382,15 @@ namespace Loxodon.Framework.Execution
 
         class FixedDelayDelayTask : AsyncResult, IDelayTask
         {
-            //private long startTime;
             private TimeSpan delay;
-            //private TimeSpan nextDelay;
             private DateTime nextTime;
             private ThreadScheduledExecutor executor;
             private Action wrappedAction;
 
             public FixedDelayDelayTask(ThreadScheduledExecutor executor, Action command, TimeSpan initialDelay, TimeSpan delay) : base()
             {
-                //this.startTime = DateTime.Now.Ticks;
                 this.delay = delay;
                 this.executor = executor;
-                //this.nextDelay = initialDelay;
                 this.nextTime = DateTime.Now + initialDelay;
 
                 this.wrappedAction = () =>
@@ -435,7 +418,8 @@ namespace Loxodon.Framework.Execution
                         {
                             this.SetCancelled();
                         }
-                        else {
+                        else
+                        {
                             //this.nextDelay = this.nextDelay.Add(this.delay);
                             this.nextTime = DateTime.Now + this.delay;
                             this.executor.Add(this);
@@ -462,11 +446,7 @@ namespace Loxodon.Framework.Execution
             {
                 try
                 {
-#if NETFX_CORE
-                    Task.Factory.StartNew(wrappedAction);
-#else
-                    ThreadPool.QueueUserWorkItem(state=>this.wrappedAction());
-#endif
+                    Executors.RunAsyncNoReturn(() => this.wrappedAction());
                 }
                 catch (Exception)
                 {

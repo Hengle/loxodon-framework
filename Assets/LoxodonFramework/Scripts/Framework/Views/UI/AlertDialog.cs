@@ -1,9 +1,34 @@
-﻿using System;
+﻿/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
+using System;
 
 using Loxodon.Log;
 using Loxodon.Framework.Execution;
 using Loxodon.Framework.ViewModels;
 using Loxodon.Framework.Contexts;
+using UnityEngine;
 
 namespace Loxodon.Framework.Views
 {
@@ -115,36 +140,14 @@ namespace Loxodon.Framework.Views
             viewModel.CancelButtonText = cancelButtonText;
             viewModel.CanceledOnTouchOutside = canceledOnTouchOutside;
             viewModel.Click = afterHideCallback;
-            viewModel.Closed = false;
 
-            ApplicationContext context = Context.GetApplicationContext();
-            IUIViewLocator locator = context.GetService<IUIViewLocator>();
-            if (locator == null)
-            {
-                if (log.IsWarnEnabled)
-                    log.Warn("Not found the \"IUIViewLocator\".");
-
-                throw new NotFoundException("Not found the \"IUIViewLocator\".");
-            }
-            AlertDialogWindow window = locator.LoadView<AlertDialogWindow>(ViewName);
-
-            if (window == null)
-            {
-                if (log.IsWarnEnabled)
-                    log.WarnFormat("Not found the \"{0}\".", typeof(AlertDialogWindow).Name);
-
-                throw new NotFoundException("Not found the \"AlertDialogWindow\".");
-            }
-
-            AlertDialog dialog = new AlertDialog(window, viewModel);
-            dialog.Show();
-            return dialog;
+            return ShowMessage(ViewName, viewModel);
         }
 
         /// <summary>
         /// Displays information to the user. 
         /// </summary>
-        /// <param name="contentView">The custom view to be shown to the user.</param>
+        /// <param name="contentView">The custom content view to be shown to the user.</param>
         /// <param name="title">The title of the dialog box. This may be null.</param>
         /// <param name="confirmButtonText">The text shown in the "confirm" button
         /// in the dialog box. If left null, the button will be invisible.</param>
@@ -169,14 +172,12 @@ namespace Loxodon.Framework.Views
             Action<int> afterHideCallback)
         {
             AlertDialogViewModel viewModel = new AlertDialogViewModel();
-            viewModel.ContentView = contentView;
             viewModel.Title = title;
             viewModel.ConfirmButtonText = confirmButtonText;
             viewModel.NeutralButtonText = neutralButtonText;
             viewModel.CancelButtonText = cancelButtonText;
             viewModel.CanceledOnTouchOutside = canceledOnTouchOutside;
             viewModel.Click = afterHideCallback;
-            viewModel.Closed = false;
 
             ApplicationContext context = Context.GetApplicationContext();
             IUIViewLocator locator = context.GetService<IUIViewLocator>();
@@ -188,26 +189,105 @@ namespace Loxodon.Framework.Views
                 throw new NotFoundException("Not found the \"IUIViewLocator\".");
             }
             AlertDialogWindow window = locator.LoadView<AlertDialogWindow>(ViewName);
-
             if (window == null)
             {
                 if (log.IsWarnEnabled)
-                    log.WarnFormat("Not found the \"{0}\".", typeof(AlertDialogWindow).Name);
+                    log.WarnFormat("Not found the dialog window named \"{0}\".", viewName);
 
-                throw new NotFoundException("Not found the \"AlertDialogWindow\".");
+                throw new NotFoundException(string.Format("Not found the dialog window named \"{0}\".", viewName));
             }
 
-            AlertDialog dialog = new AlertDialog(window, viewModel);
+            AlertDialog dialog = new AlertDialog(window, contentView, viewModel);
             dialog.Show();
             return dialog;
         }
 
+        /// <summary>
+        /// Displays information to the user. 
+        /// </summary>
+        /// <param name="viewModel">The view model of the dialog box</param>
+        /// <returns>A AlertDialog.</returns>
+        public static AlertDialog ShowMessage(AlertDialogViewModel viewModel)
+        {
+            return ShowMessage(ViewName, null, viewModel);
+        }
+
+        /// <summary>
+        /// Displays information to the user. 
+        /// </summary>
+        /// <param name="viewName">The view name of the dialog box,if it is null, use the default view name</param>
+        /// <param name="viewModel">The view model of the dialog box</param>
+        /// <returns>A AlertDialog.</returns>
+        public static AlertDialog ShowMessage(string viewName, AlertDialogViewModel viewModel)
+        {
+            return ShowMessage(viewName, null, viewModel);
+        }
+
+        /// <summary>
+        /// Displays information to the user. 
+        /// </summary>
+        /// <param name="viewName">The view name of the dialog box,if it is null, use the default view name</param>
+        /// <param name="contentViewName">The custom content view name to be shown to the user.</param>
+        /// <param name="viewModel">The view model of the dialog box</param>
+        /// <returns>A AlertDialog.</returns>
+        public static AlertDialog ShowMessage(string viewName, string contentViewName, AlertDialogViewModel viewModel)
+        {
+            AlertDialogWindow window = null;
+            IUIView contentView = null;
+            try
+            {
+                ApplicationContext context = Context.GetApplicationContext();
+                IUIViewLocator locator = context.GetService<IUIViewLocator>();
+                if (locator == null)
+                {
+                    if (log.IsWarnEnabled)
+                        log.Warn("Not found the \"IUIViewLocator\".");
+
+                    throw new NotFoundException("Not found the \"IUIViewLocator\".");
+                }
+
+                if (string.IsNullOrEmpty(viewName))
+                    viewName = ViewName;
+
+                window = locator.LoadView<AlertDialogWindow>(viewName);
+                if (window == null)
+                {
+                    if (log.IsWarnEnabled)
+                        log.WarnFormat("Not found the dialog window named \"{0}\".", viewName);
+
+                    throw new NotFoundException(string.Format("Not found the dialog window named \"{0}\".", viewName));
+                }
+
+                if (!string.IsNullOrEmpty(contentViewName))
+                    contentView = locator.LoadView<IUIView>(contentViewName);
+
+                AlertDialog dialog = new AlertDialog(window, contentView, viewModel);
+                dialog.Show();
+                return dialog;
+            }
+            catch (Exception e)
+            {
+                if (window != null)
+                    window.Dismiss();
+                if (contentView != null)
+                    GameObject.Destroy(contentView.Owner);
+
+                throw e;
+            }
+        }
+
         private AlertDialogWindow window;
+        private IUIView contentView;
         private AlertDialogViewModel viewModel;
 
-        public AlertDialog(AlertDialogWindow window, AlertDialogViewModel viewModel)
+        public AlertDialog(AlertDialogWindow window, AlertDialogViewModel viewModel) : this(window, null, viewModel)
+        {
+        }
+
+        public AlertDialog(AlertDialogWindow window, IUIView contentView, AlertDialogViewModel viewModel)
         {
             this.window = window;
+            this.contentView = contentView;
             this.viewModel = viewModel;
         }
 
@@ -219,6 +299,8 @@ namespace Loxodon.Framework.Views
         public void Show()
         {
             this.window.ViewModel = this.viewModel;
+            if (this.contentView != null)
+                this.window.ContentView = this.contentView;
             this.window.Create();
             this.window.Show();
         }
@@ -226,88 +308,6 @@ namespace Loxodon.Framework.Views
         public void Cancel()
         {
             this.window.Cancel();
-        }
-    }
-
-    public class AlertDialogViewModel : ViewModelBase
-    {
-        private string title;
-        private string message;
-        private IUIView contentView;
-        private string confirmButtonText;
-        private string neutralButtonText;
-        private string cancelButtonText;
-        private bool canceledOnTouchOutside;
-        private bool closed;
-        private Action<int> click;
-
-        public string Title
-        {
-            get { return this.title; }
-            set { this.Set<string>(ref this.title, value, "Title"); }
-        }
-
-        public string Message
-        {
-            get { return this.message; }
-            set { this.Set<string>(ref this.message, value, "Message"); }
-        }
-
-        public IUIView ContentView
-        {
-            get { return this.contentView; }
-            set { this.Set<IUIView>(ref this.contentView, value, "ContentView"); }
-        }
-
-        public string ConfirmButtonText
-        {
-            get { return this.confirmButtonText; }
-            set { this.Set<string>(ref this.confirmButtonText, value, "ConfirmButtonText"); }
-        }
-
-        public string NeutralButtonText
-        {
-            get { return this.neutralButtonText; }
-            set { this.Set<string>(ref this.neutralButtonText, value, "NeutralButtonText"); }
-        }
-
-        public string CancelButtonText
-        {
-            get { return this.cancelButtonText; }
-            set { this.Set<string>(ref this.cancelButtonText, value, "CancelButtonText"); }
-        }
-
-        public bool CanceledOnTouchOutside
-        {
-            get { return this.canceledOnTouchOutside; }
-            set { this.Set<bool>(ref this.canceledOnTouchOutside, value, "CanceledOnTouchOutside"); }
-        }
-
-        public Action<int> Click
-        {
-            get { return this.click; }
-            set { this.Set<Action<int>>(ref this.click, value, "Click"); }
-        }
-
-        public bool Closed
-        {
-            get { return this.closed; }
-            set { this.Set<bool>(ref this.closed, value, "Closed"); }
-        }
-
-        public void OnClick(int which)
-        {
-            try
-            {
-                var click = this.Click;
-                if (click != null)
-                    click(which);
-            }
-            catch (Exception) { }
-            finally
-            {
-                this.Closed = true;
-            }
         }
     }
 }

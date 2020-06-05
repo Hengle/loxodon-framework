@@ -1,4 +1,28 @@
-﻿using System;
+﻿/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -54,7 +78,7 @@ namespace Loxodon.Framework.Execution
             Create();
         }
 
-        [RuntimeInitializeOnLoadMethod]
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void OnRuntimeCreate()
         {
             Create();
@@ -96,6 +120,11 @@ namespace Loxodon.Framework.Execution
                     mainThread = currentThread;
 #endif
                     executor = CreateMainThreadExecutor(dontDestroy, useFixedUpdate);
+
+#if !NETFX_CORE && !UNITY_WEBGL
+                    if (SynchronizationContext.Current == null)
+                        SynchronizationContext.SetSynchronizationContext(new UnitySynchronizationContext());
+#endif
                 }
                 catch (Exception e)
                 {
@@ -406,6 +435,8 @@ namespace Loxodon.Framework.Execution
         {
 #if NETFX_CORE
             Task.Factory.StartNew(action);
+#elif UNITY_WEBGL
+            throw new NotSupportedException("Multithreading is not supported on the WebGL platform.");
 #elif UNITY_EDITOR
             ThreadPool.QueueUserWorkItem((state) =>
             {
@@ -753,5 +784,29 @@ namespace Loxodon.Framework.Execution
                 }
             }
         }
+
+#if !NETFX_CORE && !UNITY_WEBGL
+        sealed class UnitySynchronizationContext : SynchronizationContext
+        {
+            public UnitySynchronizationContext()
+            {
+            }
+
+            public override void Send(SendOrPostCallback callback, object state)
+            {
+                RunOnMainThread(() => { callback(state); }, true);
+            }
+
+            public override void Post(SendOrPostCallback callback, object state)
+            {
+                RunOnMainThread(() => { callback(state); }, false);
+            }
+
+            public override SynchronizationContext CreateCopy()
+            {
+                return this;
+            }
+        }
+#endif
     }
 }

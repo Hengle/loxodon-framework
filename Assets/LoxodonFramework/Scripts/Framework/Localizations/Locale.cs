@@ -1,4 +1,28 @@
-﻿using System.Globalization;
+﻿/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
+using System.Globalization;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -9,6 +33,7 @@ namespace Loxodon.Framework.Localizations
     public class Locale
     {
         private static readonly ILog log = LogManager.GetLogger(typeof(Locale));
+        private static readonly CultureInfo DEFAULT_CULTUREINFO = new CultureInfo("en");
 
         private static readonly Dictionary<SystemLanguage, CultureInfo> languages = new Dictionary<SystemLanguage, CultureInfo>()
         {
@@ -58,12 +83,16 @@ namespace Loxodon.Framework.Localizations
 
         public static CultureInfo GetCultureInfo()
         {
-            return GetCultureInfoByLanguage(Application.systemLanguage, new CultureInfo("en"));
+#if UNITY_2018_1_OR_NEWER
+            return CultureInfo.CurrentUICulture;
+#else
+            return GetCultureInfoByLanguage(Application.systemLanguage, DEFAULT_CULTUREINFO);
+#endif
         }
 
         public static CultureInfo GetCultureInfoByLanguage(SystemLanguage language)
         {
-            return GetCultureInfoByLanguage(language, new CultureInfo("en"));
+            return GetCultureInfoByLanguage(language, DEFAULT_CULTUREINFO);
         }
 
         public static CultureInfo GetCultureInfoByLanguage(SystemLanguage language, CultureInfo defaultValue)

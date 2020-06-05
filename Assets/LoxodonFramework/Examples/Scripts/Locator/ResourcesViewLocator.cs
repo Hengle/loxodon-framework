@@ -1,4 +1,28 @@
-﻿using System;
+﻿/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -22,17 +46,44 @@ namespace Loxodon.Framework.Examples
             return name.Substring(0, index);
         }
 
+        protected virtual IWindowManager GetDefaultWindowManager()
+        {
+            if (globalWindowManager != null)
+                return globalWindowManager;
+
+            globalWindowManager = GameObject.FindObjectOfType<GlobalWindowManager>();
+            if (globalWindowManager == null)
+                throw new NotFoundException("GlobalWindowManager");
+
+            return globalWindowManager;
+        }
+
         public override T LoadView<T>(string name)
         {
             name = Normalize(name);
-
             WeakReference weakRef;
-            GameObject viewTemplateGo;
-            if (this.templates.TryGetValue(name, out weakRef) && weakRef.IsAlive)
+            GameObject viewTemplateGo = null;
+            try
             {
-                viewTemplateGo = (GameObject)weakRef.Target;
+                if (this.templates.TryGetValue(name, out weakRef) && weakRef.IsAlive)
+                {
+                    viewTemplateGo = (GameObject)weakRef.Target;
+
+                    //Check if the object is valid because it may have been destroyed.
+                    //Unmanaged objects,the weak caches do not accurately track the validity of objects.
+                    if (viewTemplateGo != null)
+                    {
+                        string goName = viewTemplateGo.name;
+                    }
+                }
             }
-            else {
+            catch (Exception)
+            {
+                viewTemplateGo = null;
+            }
+
+            if (viewTemplateGo == null)
+            {
                 viewTemplateGo = Resources.Load<GameObject>(name);
                 if (viewTemplateGo != null)
                 {
@@ -46,7 +97,10 @@ namespace Loxodon.Framework.Examples
 
             GameObject go = GameObject.Instantiate(viewTemplateGo);
             go.name = viewTemplateGo.name;
-            return go.GetComponent<T>();
+            T view = go.GetComponent<T>();
+            if (view == null && go != null)
+                GameObject.Destroy(go);
+            return view;
         }
 
         public override IProgressTask<float, T> LoadViewAsync<T>(string name)
@@ -58,14 +112,29 @@ namespace Loxodon.Framework.Examples
         protected virtual IEnumerator DoLoad<T>(IProgressPromise<float, T> promise, string name)
         {
             name = Normalize(name);
-
             WeakReference weakRef;
-            GameObject viewTemplateGo;
-            if (this.templates.TryGetValue(name, out weakRef) && weakRef.IsAlive)
+            GameObject viewTemplateGo = null;
+            try
             {
-                viewTemplateGo = (GameObject)weakRef.Target;
+                if (this.templates.TryGetValue(name, out weakRef) && weakRef.IsAlive)
+                {
+                    viewTemplateGo = (GameObject)weakRef.Target;
+
+                    //Check if the object is valid because it may have been destroyed.
+                    //Unmanaged objects,the weak caches do not accurately track the validity of objects.
+                    if (viewTemplateGo != null)
+                    {
+                        string goName = viewTemplateGo.name;
+                    }
+                }
             }
-            else {
+            catch (Exception)
+            {
+                viewTemplateGo = null;
+            }
+
+            if (viewTemplateGo == null)
+            {
                 ResourceRequest request = Resources.LoadAsync<GameObject>(name);
                 while (!request.isDone)
                 {
@@ -90,20 +159,17 @@ namespace Loxodon.Framework.Examples
 
             GameObject go = GameObject.Instantiate(viewTemplateGo);
             go.name = viewTemplateGo.name;
-            promise.UpdateProgress(1f);
-            promise.SetResult(go.GetComponent<T>());
-        }
-
-        protected virtual IWindowManager GetDefaultWindowManager()
-        {
-            if (globalWindowManager != null)
-                return globalWindowManager;
-
-            globalWindowManager = GameObject.FindObjectOfType<GlobalWindowManager>();
-            if (globalWindowManager == null)
-                throw new NotFoundException("GlobalWindowManager");
-
-            return globalWindowManager;
+            T view = go.GetComponent<T>();
+            if (view == null)
+            {
+                GameObject.Destroy(go);
+                promise.SetException(new NotFoundException(name));
+            }
+            else
+            {
+                promise.UpdateProgress(1f);
+                promise.SetResult(view);
+            }
         }
 
         public override T LoadWindow<T>(string name)
@@ -118,9 +184,7 @@ namespace Loxodon.Framework.Examples
 
             T target = this.LoadView<T>(name);
             if (target != null)
-            {
                 target.WindowManager = windowManager;
-            }
 
             return target;
         }

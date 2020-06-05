@@ -1,3 +1,27 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,16 +33,13 @@ namespace Loxodon.Framework.Commands
     /// <summary>
     /// The CompositeCommand composes one or more ICommands.
     /// </summary>
-    public class CompositeCommand : ICommand
+    public class CompositeCommand : CommandBase
     {
         private static readonly ILog log = LogManager.GetLogger(typeof(CompositeCommand));
 
         private readonly List<ICommand> commands = new List<ICommand>();
         private readonly bool monitorCommandActivity;
         private readonly EventHandler onCanExecuteChangedHandler;
-
-        private readonly object _lock = new object();
-        private EventHandler canExecuteChanged;
 
         /// <summary>
         /// Initializes a new instance of <see cref="CompositeCommand"/>.
@@ -82,23 +103,20 @@ namespace Loxodon.Framework.Commands
             if (command == null)
                 throw new ArgumentNullException("command");
 
-            bool removed;
             lock (this.commands)
             {
-                removed = this.commands.Remove(command);
+                if (!this.commands.Remove(command))
+                    return;
             }
 
-            if (removed)
-            {
-                command.CanExecuteChanged -= this.onCanExecuteChangedHandler;
-                this.RaiseCanExecuteChanged();
+            command.CanExecuteChanged -= this.onCanExecuteChangedHandler;
+            this.RaiseCanExecuteChanged();
 
-                if (this.monitorCommandActivity)
-                {
-                    var activeAwareCommand = command as IActiveAware;
-                    if (activeAwareCommand != null)
-                        activeAwareCommand.IsActiveChanged -= this.OnIsActiveChanged;
-                }
+            if (this.monitorCommandActivity)
+            {
+                var activeAwareCommand = command as IActiveAware;
+                if (activeAwareCommand != null)
+                    activeAwareCommand.IsActiveChanged -= this.OnIsActiveChanged;
             }
         }
 
@@ -120,15 +138,16 @@ namespace Loxodon.Framework.Commands
         /// If the command does not require data to be passed, this object can be set to <see langword="null" />.
         /// </param>
         /// <returns><see langword="true" /> if all of the commands return <see langword="true" />; otherwise, <see langword="false" />.</returns>
-        public virtual bool CanExecute(object parameter)
+        public override bool CanExecute(object parameter)
         {
-            bool executable = false;
-
             ICommand[] commandList;
             lock (this.commands)
             {
                 commandList = this.commands.ToArray();
             }
+
+            if (commandList.Length <= 0)
+                return false;
 
             foreach (ICommand command in commandList)
             {
@@ -137,20 +156,9 @@ namespace Loxodon.Framework.Commands
 
                 if (!command.CanExecute(parameter))
                     return false;
-
-                executable = true;
             }
 
-            return executable;
-        }
-
-        /// <summary>
-        /// Occurs when any of the registered commands raise <see cref="ICommand.CanExecuteChanged"/>.
-        /// </summary>
-        public event EventHandler CanExecuteChanged
-        {
-            add { lock (_lock) { this.canExecuteChanged += value; } }
-            remove { lock (_lock) { this.canExecuteChanged -= value; } }
+            return true;
         }
 
         /// <summary>
@@ -159,7 +167,7 @@ namespace Loxodon.Framework.Commands
         /// <param name="parameter">Data used by the command.
         /// If the command does not require data to be passed, this object can be set to <see langword="null" />.
         /// </param>
-        public virtual void Execute(object parameter)
+        public override void Execute(object parameter)
         {
             Queue<ICommand> commands;
             lock (this.commands)
@@ -195,14 +203,14 @@ namespace Loxodon.Framework.Commands
         /// property is <see langword="false" />; otherwise it always returns <see langword="true" />.</remarks>
         protected virtual bool ShouldExecute(ICommand command)
         {
+            if (!this.monitorCommandActivity)
+                return true;
+
             var activeAwareCommand = command as IActiveAware;
+            if (activeAwareCommand == null)
+                return true;
 
-            if (this.monitorCommandActivity && activeAwareCommand != null)
-            {
-                return activeAwareCommand.IsActive;
-            }
-
-            return true;
+            return activeAwareCommand.IsActive;
         }
 
         /// <summary>
@@ -222,13 +230,6 @@ namespace Loxodon.Framework.Commands
 
                 return commandList;
             }
-        }
-
-        protected virtual void RaiseCanExecuteChanged()
-        {
-            var handler = this.canExecuteChanged;
-            if (handler != null)
-                handler(this, EventArgs.Empty);
         }
     }
 }

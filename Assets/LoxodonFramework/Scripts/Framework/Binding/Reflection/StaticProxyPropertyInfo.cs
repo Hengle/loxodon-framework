@@ -1,63 +1,86 @@
-﻿using System;
+﻿/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
+using System;
 using System.Reflection;
 
 using Loxodon.Log;
 
 namespace Loxodon.Framework.Binding.Reflection
 {
-    public class StaticProxyPropertyInfo<T, TValue> : AbstractProxyPropertyInfo, IProxyPropertyInfo<T, TValue>
+    public class StaticProxyPropertyInfo<T, TValue> : ProxyPropertyInfo, IProxyPropertyInfo<T, TValue>
     {
         private static readonly ILog log = LogManager.GetLogger(typeof(StaticProxyPropertyInfo<T, TValue>));
 
-        private Func<TValue> _getter;
-        private Action<TValue> _setter;
+        private Func<TValue> getter;
+        private Action<TValue> setter;
 
-        public StaticProxyPropertyInfo(string propertyName) : this(typeof(T).GetProperty(propertyName), null, null)
+        public StaticProxyPropertyInfo(string propertyName) : this(typeof(T).GetProperty(propertyName))
         {
         }
 
-        public StaticProxyPropertyInfo(PropertyInfo info) : this(info, null, null)
+        public StaticProxyPropertyInfo(PropertyInfo propertyInfo) : base(propertyInfo)
         {
+            if (!typeof(TValue).Equals(this.propertyInfo.PropertyType) || !propertyInfo.DeclaringType.IsAssignableFrom(typeof(T)))
+                throw new ArgumentException("The property types do not match!");
+
+            if (!this.IsStatic)
+                throw new ArgumentException("The property isn't static!");
+
+            this.getter = this.MakeGetter(propertyInfo);
+            this.setter = this.MakeSetter(propertyInfo);
         }
 
         public StaticProxyPropertyInfo(string propertyName, Func<TValue> getter, Action<TValue> setter) : this(typeof(T).GetProperty(propertyName), getter, setter)
         {
         }
 
-        public StaticProxyPropertyInfo(PropertyInfo info, Func<TValue> getter, Action<TValue> setter) : base(info)
+        public StaticProxyPropertyInfo(PropertyInfo propertyInfo, Func<TValue> getter, Action<TValue> setter) : base(propertyInfo)
         {
-            if (!info.IsStatic())
-                throw new ArgumentException("The property isn't static!");
-
-            if (!typeof(TValue).Equals(this.propertyInfo.PropertyType) || !typeof(T).Equals(this.propertyInfo.DeclaringType))
+            if (!typeof(TValue).Equals(this.propertyInfo.PropertyType) || !propertyInfo.DeclaringType.IsAssignableFrom(typeof(T)))
                 throw new ArgumentException("The property types do not match!");
 
-            this.isStatic = true;
+            if (!this.IsStatic)
+                throw new ArgumentException("The property isn't static!");
 
-            this._getter = getter;
-            this._setter = setter;
-
-            if (this._getter == null)
-                this._getter = this.MakeGetter(this.propertyInfo);
-
-            if (this._setter == null)
-                this._setter = this.MakeSetter(this.propertyInfo);
-
-            this.canRead = this._getter != null || this.propertyInfo.CanRead;
-            this.canWrite = this._setter != null || this.propertyInfo.CanWrite;
+            this.getter = getter;
+            this.setter = setter;
         }
+
+        public override Type DeclaringType { get { return typeof(T); } }
 
         private Action<TValue> MakeSetter(PropertyInfo propertyInfo)
         {
             try
             {
-                if (isValueType)
+                if (this.IsValueType)
                     return null;
 
                 var setMethod = propertyInfo.GetSetMethod();
                 if (setMethod == null)
                     return null;
-#if NETFX_CORE
+#if NETFX_CORE || NET_4_6 || NET_STANDARD_2_0 || NET46 || NETSTANDARD2_0
                 return (Action<TValue>)setMethod.CreateDelegate(typeof(Action<TValue>));
 #elif !UNITY_IOS
                 return (Action<TValue>)Delegate.CreateDelegate(typeof(Action<TValue>), setMethod);
@@ -68,6 +91,7 @@ namespace Loxodon.Framework.Binding.Reflection
                 if (log.IsWarnEnabled)
                     log.WarnFormat("{0}", e);
             }
+
             return null;
         }
 
@@ -75,14 +99,13 @@ namespace Loxodon.Framework.Binding.Reflection
         {
             try
             {
-                if (isValueType)
+                if (this.IsValueType)
                     return null;
 
                 var getMethod = propertyInfo.GetGetMethod();
                 if (getMethod == null)
                     return null;
-
-#if NETFX_CORE
+#if NETFX_CORE || NET_4_6 || NET_STANDARD_2_0 || NET46 || NETSTANDARD2_0
                 return (Func<TValue>)getMethod.CreateDelegate(typeof(Func<TValue>));
 #elif !UNITY_IOS
                 return (Func<TValue>)Delegate.CreateDelegate(typeof(Func<TValue>), getMethod);
@@ -93,48 +116,55 @@ namespace Loxodon.Framework.Binding.Reflection
                 if (log.IsWarnEnabled)
                     log.WarnFormat("{0}", e);
             }
-
             return null;
         }
 
-        public virtual TValue GetValue(T target)
+        public TValue GetValue(T target)
         {
-            if (!this.canRead)
-                throw new MemberAccessException();
+            if (this.getter != null)
+                return this.getter();
 
-            if (this._getter != null)
-                return this._getter();
-
-            var method = this.propertyInfo.GetGetMethod();
-            return (TValue)method.Invoke(null, null);
+            return (TValue)base.GetValue(null);
         }
 
-        public override object GetValue(object target, object index = null)
+        TValue IProxyPropertyInfo<TValue>.GetValue(object target)
         {
-            return this.GetValue(default(T));
+            return this.GetValue((T)target);
         }
 
-        public virtual void SetValue(T target, TValue newValue)
+        public override object GetValue(object target)
         {
-            if (this.isValueType)
-                throw new NotSupportedException("Assignments of Value type are not supported.");
+            if (this.getter != null)
+                return this.getter();
 
-            if (!this.canWrite)
-                throw new MemberAccessException();
+            return base.GetValue(target);
+        }
 
-            if (this._setter != null)
+        public void SetValue(T target, TValue value)
+        {
+            if (setter != null)
             {
-                this._setter(newValue);
+                setter(value);
                 return;
             }
 
-            var method = this.propertyInfo.GetSetMethod();
-            method.Invoke(target, new object[] { newValue });
+            base.SetValue(null,value);
         }
 
-        public override void SetValue(object target, object newValue, object index = null)
+        public void SetValue(object target, TValue value)
         {
-            this.SetValue(default(T), newValue != null ? (TValue)newValue : default(TValue));
+            this.SetValue((T)target, value);
+        }
+
+        public override void SetValue(object target, object value)
+        {
+            if (setter != null)
+            {
+                setter((TValue)value);
+                return;
+            }
+
+            base.SetValue(null, value);
         }
     }
 }

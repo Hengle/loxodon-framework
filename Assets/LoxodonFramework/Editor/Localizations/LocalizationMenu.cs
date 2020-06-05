@@ -1,4 +1,28 @@
-﻿using UnityEngine;
+﻿/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
+using UnityEngine;
 using UnityEditor;
 using System;
 using System.IO;
@@ -45,7 +69,7 @@ namespace Loxodon.Framework.Editors
 					if (!path.ToLower ().EndsWith (EXTENSION))
 						continue;
 					
-					var dict = parser.Parse (new MemoryStream ((s as TextAsset).bytes));
+					var dict = parser.Parse (new MemoryStream ((s as TextAsset).bytes), Locale.GetCultureInfo());
 					foreach (KeyValuePair<string,object> kv in dict) {
 						data [kv.Key] = kv.Value;
 					}
@@ -67,6 +91,9 @@ namespace Loxodon.Framework.Editors
 		static string GetRelativeDirectory (string location)
 		{
 			int start = location.LastIndexOf ("Assets");
+            if (start < 0)
+                return "Assets";
+
 			int end = location.LastIndexOf ("/") + 1;
 			return location.Substring (start, (end - start));
 		}

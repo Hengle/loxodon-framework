@@ -1,4 +1,28 @@
-﻿using Loxodon.Framework.Binding;
+﻿/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
+using Loxodon.Framework.Binding;
 using Loxodon.Framework.Binding.Builder;
 using Loxodon.Framework.Binding.Contexts;
 using Loxodon.Framework.Binding.Converters;
@@ -125,7 +149,6 @@ namespace Loxodon.Framework.Tutorials
 
     public class ListViewDatabindingExample : MonoBehaviour
     {
-        private int itemCount;
         private ListViewViewModel viewModel;
 
         public Button addButton;
@@ -161,18 +184,19 @@ namespace Loxodon.Framework.Tutorials
             {
                 viewModel.AddItem();
             }
+            viewModel.Items[0].IsSelected = true;
 
             IBindingContext bindingContext = this.BindingContext();
             bindingContext.DataContext = viewModel;
 
             BindingSet<ListViewDatabindingExample, ListViewViewModel> bindingSet = this.CreateBindingSet<ListViewDatabindingExample, ListViewViewModel>();
             bindingSet.Bind(this.listView).For(v => v.Items).To(vm => vm.Items).OneWay();
-            bindingSet.Bind(this.listView).For(v => v.OnSelectChanged).To(vm => vm.Select(0)).OneWay();
+            bindingSet.Bind(this.listView).For(v => v.OnSelectChanged).To<int>(vm => vm.Select).OneWay();
 
-            bindingSet.Bind(this.addButton).For(v => v.onClick).To(vm => vm.AddItem());
-            bindingSet.Bind(this.removeButton).For(v => v.onClick).To(vm => vm.RemoveItem());
-            bindingSet.Bind(this.clearButton).For(v => v.onClick).To(vm => vm.ClearItem());
-            bindingSet.Bind(this.changeIconButton).For(v => v.onClick).To(vm => vm.ChangeItemIcon());
+            bindingSet.Bind(this.addButton).For(v => v.onClick).To(vm => vm.AddItem);
+            bindingSet.Bind(this.removeButton).For(v => v.onClick).To(vm => vm.RemoveItem);
+            bindingSet.Bind(this.clearButton).For(v => v.onClick).To(vm => vm.ClearItem);
+            bindingSet.Bind(this.changeIconButton).For(v => v.onClick).To(vm => vm.ChangeItemIcon);
 
             bindingSet.Build();
         }

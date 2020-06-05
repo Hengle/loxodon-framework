@@ -1,42 +1,56 @@
-﻿using System;
-using System.Reflection;
+﻿/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
 
-using Loxodon.Log;
+using Loxodon.Framework.Binding.Reflection;
+using System;
 
 namespace Loxodon.Framework.Binding.Proxy.Targets
 {
-    public class EventTargetProxy : AbstractTargetProxy
+    public class EventTargetProxy : EventTargetProxyBase
     {
-        //private static readonly ILog log = LogManager.GetLogger(typeof(EventTargetProxy));
-
         private bool disposed = false;
-        protected readonly EventInfo eventInfo;
+        protected readonly IProxyEventInfo eventInfo;
         protected Delegate handler;
 
-        public override Type Type { get { return this.eventInfo.EventHandlerType; } }
-
-        public override BindingMode DefaultMode { get { return BindingMode.OneWay; } }
-
-        public EventTargetProxy(object target, EventInfo eventInfo) : base(target)
+        public EventTargetProxy(object target, IProxyEventInfo eventInfo) : base(target)
         {
             this.eventInfo = eventInfo;
         }
 
-        protected override void Dispose(bool disposing)
-        {
-            if (!disposed)
-            {
-                var target = this.Target;
-                if (this.eventInfo.IsStatic() || target != null)
-                    this.Unbind(target);
+        public override Type Type { get { return this.eventInfo.HandlerType; } }
 
-                disposed = true;
-                base.Dispose(disposing);
-            }
-        }
+        public override BindingMode DefaultMode { get { return BindingMode.OneWay; } }
 
-        protected override void SetValueImpl(object target, object value)
+        public override void SetValue(object value)
         {
+            if (value != null && !value.GetType().Equals(this.Type))
+                throw new ArgumentException("Binding delegate to event failed, mismatched delegate type", "value");
+
+            var target = this.Target;
+            if (target == null)
+                return;
+
             Unbind(target);
 
             if (value == null)
@@ -48,8 +62,11 @@ namespace Loxodon.Framework.Binding.Proxy.Targets
                 Bind(target);
                 return;
             }
+        }
 
-            throw new NotSupportedException();
+        public override void SetValue<TValue>(TValue value)
+        {
+            this.SetValue((object)value);
         }
 
         protected virtual void Bind(object target)
@@ -58,7 +75,7 @@ namespace Loxodon.Framework.Binding.Proxy.Targets
                 return;
 
             if (this.eventInfo != null)
-                this.eventInfo.AddEventHandler(target, handler);
+                this.eventInfo.Add(target, handler);
         }
 
         protected virtual void Unbind(object target)
@@ -67,9 +84,22 @@ namespace Loxodon.Framework.Binding.Proxy.Targets
                 return;
 
             if (this.eventInfo != null)
-                this.eventInfo.RemoveEventHandler(target, handler);
+                this.eventInfo.Remove(target, handler);
 
             this.handler = null;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (!disposed)
+            {
+                var target = this.Target;
+                if (this.eventInfo.IsStatic || target != null)
+                    this.Unbind(target);
+
+                disposed = true;
+                base.Dispose(disposing);
+            }
         }
     }
 }

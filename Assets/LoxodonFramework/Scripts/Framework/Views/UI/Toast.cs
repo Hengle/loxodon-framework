@@ -1,4 +1,28 @@
-﻿using System.Collections;
+﻿/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
+using System.Collections;
 using UnityEngine;
 
 using Loxodon.Framework.Contexts;
@@ -40,29 +64,32 @@ namespace Loxodon.Framework.Views
             ApplicationContext context = Context.GetApplicationContext();
             IUIViewLocator locator = context.GetService<IUIViewLocator>();
             ToastView view = locator.LoadView<ToastView>(viewName);
-            Toast toast = new Toast(viewGroup, text, duration, layout);
-            toast.View = view;
+            if (view == null)
+                throw new NotFoundException("Not found the \"ToastView\".");
+
+            Toast toast = new Toast(view, viewGroup, text, duration, layout);
             toast.Show();
             return toast;
         }
 
-        private IUIViewGroup viewGroup;
-        private float duration;
-        private string text;
-        private ToastView view;
-        private UILayout layout;
-        private Action callback;
+        private readonly IUIViewGroup viewGroup;
+        private readonly float duration;
+        private readonly string text;
+        private readonly ToastView view;
+        private readonly UILayout layout;
+        private readonly Action callback;
 
-        protected Toast(IUIViewGroup viewGroup, string text, float duration) : this(viewGroup, text, duration, null, null)
+        protected Toast(ToastView view, IUIViewGroup viewGroup, string text, float duration) : this(view, viewGroup, text, duration, null, null)
         {
         }
 
-        protected Toast(IUIViewGroup viewGroup, string text, float duration, UILayout layout) : this(viewGroup, text, duration, layout, null)
+        protected Toast(ToastView view, IUIViewGroup viewGroup, string text, float duration, UILayout layout) : this(view, viewGroup, text, duration, layout, null)
         {
         }
 
-        protected Toast(IUIViewGroup viewGroup, string text, float duration, UILayout layout, Action callback)
+        protected Toast(ToastView view, IUIViewGroup viewGroup, string text, float duration, UILayout layout, Action callback)
         {
+            this.view = view;
             this.viewGroup = viewGroup;
             this.text = text;
             this.duration = duration;
@@ -73,19 +100,16 @@ namespace Loxodon.Framework.Views
         public float Duration
         {
             get { return this.duration; }
-            protected set { this.duration = value; }
         }
 
         public string Text
         {
             get { return this.text; }
-            protected set { this.text = value; }
         }
 
         public ToastView View
         {
             get { return this.view; }
-            protected set { this.view = value; }
         }
 
         public void Cancel()

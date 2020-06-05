@@ -1,4 +1,28 @@
-﻿using System;
+﻿/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
+using System;
 using System.Collections;
 
 using Loxodon.Log;
@@ -13,6 +37,7 @@ namespace Loxodon.Framework.Views
         private Window window;
         private bool done = false;
         private bool animationDisabled = false;
+        private int layer = 0;
 
         private bool running = false;
 
@@ -74,6 +99,12 @@ namespace Loxodon.Framework.Views
         {
             get { return this.animationDisabled; }
             protected set { this.animationDisabled = value; }
+        }
+
+        public virtual int Layer
+        {
+            get { return this.layer; }
+            protected set { this.layer = value; }
         }
 
         protected void StateChanged(object sender, WindowStateEventArgs e)
@@ -147,6 +178,20 @@ namespace Loxodon.Framework.Views
             }
 
             this.animationDisabled = disabled;
+            return this;
+        }
+
+        public ITransition AtLayer(int layer)
+        {
+            if (this.running)
+            {
+                if (log.IsWarnEnabled)
+                    log.WarnFormat("The transition is running.sets the layer failed.");
+
+                return this;
+            }
+
+            this.layer = layer;
             return this;
         }
 

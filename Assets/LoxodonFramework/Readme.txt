@@ -1,5 +1,5 @@
-﻿Loxodon Framework
-Version: 1.7.5
+﻿  Loxodon Framework
+Version: 1.9.8
 © 2016, Clark Yang
 =======================================
 
@@ -16,6 +16,75 @@ AOT Compilation Options: "nrgctx-trampolines=8192,nimt-trampolines=8192,ntrampol
 
 UPDATE NOTES
 ----------------------------------------
+version 1.9.8
+	Fixed the bug that failed to create temporary file in the DownloadFileHandler.
+
+version 1.9.7
+	Added more detailed binding exception information.
+	Added LocalizedDataBinder
+
+version 1.9.6
+	Added AtLayer method to ITransition, which supports opening a new window in the background.
+
+version 1.9.4
+	Added the object pool.
+
+version 1.9.2
+	Fixed bug with multithreading on webgl platform.
+
+version 1.9.1
+	Fixed a bug that Lua expressions have been destroyed when rebinding.
+
+version 1.9.0
+	Added localization of Sprite,Texture,AudioClip,VideoClip,Font,etc.
+	Fixed a bug that does not trigger a value change notification when an expression is bound to a static "IObservableProperty".
+
+version 1.8.10
+	Fixed a bug that WindowManager.Clear() cannot clear.
+	Added AES CTR encryption algorithm, and supports stream encryption and the "Seek" feature of encrypted stream.
+	Fixed bugs on the UWP.
+	Fixed a bug that failed to compile on the ios platform.
+	Added System.Type.IsSZArray to the blacklist to avoid errors when xlua generates code.
+
+version 1.8.9
+	Added CoroutineTask.
+	Fixed a bug in the PathParser.
+	Added LocalizedAudioSourceInResources,LocalizedImageInResources,LocalizedRawImageInResources.
+
+version 1.8.7
+	Added encryption and decryption feature.
+	Added lua precompilation tools
+	Added lua script loader
+
+version 1.8.6
+	Changed Localization.GetText(string key, params object[] args) to GetFormattedText(string key, params object[] args).
+	Changed IConfiguration.GetString(string key, params object[] args) to GetFormattedString(string key, params object[] args).
+	Deleted Localization.GetText(string key, string defaultValue, params object[] args) and IConfiguration.GetString(string key, string defaultValue, params object[] args).
+	In order to support localized files in csv format,changed IDocumentParser.Parse(Stream input) to IDocumentParser.Parse(Stream input, CultureInfo cultureInfo)
+
+version 1.8.5
+	Added configuration module to read properties file.
+	Added "Subset" method in the "Localization" class to support the creation of a subset of Localization.
+
+version 1.8.4
+	Added a logging system to the Lua plugin
+	Added CommandParameter for data binding,support multiple buttons to bind to the same command.
+	Added InteractionAction.
+	Added IDialogService.
+
+version 1.8.2
+	Fixed a bug in expression binding.
+	Fixed a bug when loading lua scripts via file path.
+
+version 1.8.0
+	Rewrite the code of the data binding module to optimize data binding performance and reduce gc as much as possible.Please remove the old version of the code before updating to 1.8.0.
+
+version 1.7.8
+	Supports Lua to override method of the parent class of C#,and added the ability to access methods and properties of the parent class of C#.
+
+version 1.7.6
+	Added Chinese document.
+
 version 1.7.5
 	Added support for XLua.
 

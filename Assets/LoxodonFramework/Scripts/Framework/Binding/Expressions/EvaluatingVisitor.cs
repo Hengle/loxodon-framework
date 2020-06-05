@@ -1,3 +1,27 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
 using System;
 using System.Linq;
 using System.Linq.Expressions;
@@ -582,7 +606,8 @@ namespace Loxodon.Framework.Binding.Expressions
                             if (expr.Conversion != null)
                                 result = Evaluate(expr.Conversion, values, result);
                         }
-                        else {
+                        else
+                        {
                             result = right;
                         }
                         break;
@@ -594,14 +619,16 @@ namespace Loxodon.Framework.Binding.Expressions
                         {
                             result = ((Array)left).GetValue((int)right);
                         }
-                        else {
+                        else
+                        {
                             result = ((Array)left).GetValue((long)right);
                         }
 #endif
                         break;
                 }
             }
-            else {
+            else
+            {
 #if NETFX_CORE
                 TypeCode typeCode = WinRTLegacy.TypeExtensions.GetTypeCode(unliftedLeft);
 #else
@@ -669,7 +696,8 @@ namespace Loxodon.Framework.Binding.Expressions
                 realSourceType = Unlift(expr.Operand.Type);
                 realTargetType = Unlift(expr.Type);
             }
-            else {
+            else
+            {
                 realSourceType = expr.Operand.Type;
                 realTargetType = expr.Type;
             }
@@ -955,13 +983,28 @@ namespace Loxodon.Framework.Binding.Expressions
             return Expression.Constant(result, expr.Type.Equals(typeof(void)) ? typeof(object) : expr.Type);
         }
 
+        protected override Expression VisitNewArrayInit(NewArrayExpression expr)
+        {
+            var expressions = expr.Expressions;
+            int count = expressions != null ? expressions.Count : 0;
+            Array array = (Array)Activator.CreateInstance(expr.Type, count);
+            for (int i = 0; i < count; i++)
+            {
+                var expression = this.Visit(expressions[i]);
+                ConstantExpression constantExpression = expression as ConstantExpression;
+                if (constantExpression != null)
+                    array.SetValue(constantExpression.Value, i);
+            }
+            return Expression.Constant(array, expr.Type);
+        }
+
         internal static object Evaluate(LambdaExpression expr, Scope scope, params object[] args)
         {
             var visitor = new EvaluatingVisitor();
             visitor.values = new Scope(scope);
 
             var first = expr.Parameters.GetEnumerator();
-            var sencond = args.GetEnumerator();
+            var sencond = args != null ? args.GetEnumerator() : null;
             while (first.MoveNext())
             {
                 if (sencond.MoveNext())

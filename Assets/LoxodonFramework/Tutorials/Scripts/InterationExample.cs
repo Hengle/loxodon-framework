@@ -1,4 +1,28 @@
-﻿using System;
+﻿/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
+using System;
 using System.Globalization;
 using System.Collections.Generic;
 using UnityEngine;
@@ -14,13 +38,14 @@ using Loxodon.Framework.ViewModels;
 using Loxodon.Framework.Interactivity;
 using Loxodon.Framework.Commands;
 using Loxodon.Framework.Services;
+using Loxodon.Framework.Views.InteractionActions;
 
 namespace Loxodon.Framework.Tutorials
 {
     public class InterationViewModel : ViewModelBase
     {
         private InteractionRequest<DialogNotification> alertDialogRequest;
-        private InteractionRequest<Notification> toastRequest;
+        private InteractionRequest<ToastNotification> toastRequest;
         private InteractionRequest<VisibilityNotification> loadingRequest;
 
         private SimpleCommand openAlertDialog;
@@ -31,7 +56,7 @@ namespace Loxodon.Framework.Tutorials
         public InterationViewModel()
         {
             this.alertDialogRequest = new InteractionRequest<DialogNotification>(this);
-            this.toastRequest = new InteractionRequest<Notification>(this);
+            this.toastRequest = new InteractionRequest<ToastNotification>(this);
             this.loadingRequest = new InteractionRequest<VisibilityNotification>();
 
             this.openAlertDialog = new SimpleCommand(() =>
@@ -59,7 +84,7 @@ namespace Loxodon.Framework.Tutorials
 
             this.showToast = new SimpleCommand(() =>
             {
-                Notification notification = new Notification("This is a toast test.");
+                ToastNotification notification = new ToastNotification("This is a toast test.", 2f);
                 this.toastRequest.Raise(notification);
             });
 
@@ -96,6 +121,9 @@ namespace Loxodon.Framework.Tutorials
 
         private List<Loading> list = new List<Loading>();
 
+        private LoadingInteractionAction loadingInteractionAction;
+        private ToastInteractionAction toastInteractionAction;
+
         protected override void Awake()
         {
             ApplicationContext context = Context.GetApplicationContext();
@@ -107,21 +135,35 @@ namespace Loxodon.Framework.Tutorials
             container.Register<IUIViewLocator>(new DefaultUIViewLocator());
 
             CultureInfo cultureInfo = Locale.GetCultureInfo();
-            Localization.Current = Localization.Create(new DefaultDataProvider("LocalizationTutorials", new XmlDocumentParser()), cultureInfo);
+            var localization = Localization.Current;
+            localization.CultureInfo = cultureInfo;
+            localization.AddDataProvider(new DefaultDataProvider("LocalizationTutorials", new XmlDocumentParser()));
+            container.Register(localization);
         }
 
         protected override void Start()
         {
+            this.loadingInteractionAction = new LoadingInteractionAction();
+            this.toastInteractionAction = new ToastInteractionAction(this);
+
             InterationViewModel viewModel = new InterationViewModel();
             this.SetDataContext(viewModel);
 
             /* databinding */
             BindingSet<InterationExample, InterationViewModel> bindingSet = this.CreateBindingSet<InterationExample, InterationViewModel>();
 
-            /* Binding interaction request */
-            bindingSet.Bind().For(v => this.OnOpenAlert(null, null)).To(vm => vm.AlertDialogRequest);
-            bindingSet.Bind().For(v => this.OnShowToast(null, null)).To(vm => vm.ToastRequest);
-            bindingSet.Bind().For(v => this.OnShowOrHideLoading(null, null)).To(vm => vm.LoadingRequest);
+            /* Bind the method "OnOpenAlert" to an interactive request */
+            bindingSet.Bind().For(v => v.OnOpenAlert).To(vm => vm.AlertDialogRequest);
+
+            /* Bind the ToastInteractionAction to an interactive request */
+            bindingSet.Bind().For(v => v.toastInteractionAction).To(vm => vm.ToastRequest);
+            /* or bind the method "OnShowToast" to an interactive request */
+            //bindingSet.Bind().For(v => v.OnShowToast).To(vm => vm.ToastRequest);
+
+            /* Bind the LoadingInteractionAction to an interactive request */
+            bindingSet.Bind().For(v => v.loadingInteractionAction).To(vm => vm.LoadingRequest);
+            /* or bind the method "OnShowOrHideLoading" to an interactive request */
+            //bindingSet.Bind().For(v => v.OnShowOrHideLoading).To(vm => vm.LoadingRequest);
 
             /* Binding command */
             bindingSet.Bind(this.openAlert).For(v => v.onClick).To(vm => vm.OpenAlertDialog);
@@ -151,11 +193,11 @@ namespace Loxodon.Framework.Tutorials
 
         private void OnShowToast(object sender, InteractionEventArgs args)
         {
-            Notification notification = args.Context as Notification;
+            ToastNotification notification = args.Context as ToastNotification;
             if (notification == null)
                 return;
 
-            Toast.Show(this, notification.Message, 2f);
+            Toast.Show(this, notification.Message, notification.Duration);
         }
 
         private void OnShowOrHideLoading(object sender, InteractionEventArgs args)

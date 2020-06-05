@@ -1,3 +1,27 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
 using System;
 using System.Collections.Generic;
 
@@ -14,6 +38,7 @@ namespace Loxodon.Framework.Binding.Contexts
         private readonly Dictionary<object, List<IBinding>> bindings = new Dictionary<object, List<IBinding>>();
 
         private IBinder binder;
+        private object owner;
         private object dataContext;
         private readonly object _lock = new object();
         private EventHandler dataContextChanged;
@@ -24,22 +49,28 @@ namespace Loxodon.Framework.Binding.Contexts
             remove { lock (_lock) { this.dataContextChanged -= value; } }
         }
 
-        public BindingContext(IBinder binder) : this(binder, (object)null)
+        public BindingContext(IBinder binder) : this(null, binder, (object)null)
         {
         }
 
-        public BindingContext(IBinder binder, object dataContext)
+        public BindingContext(object owner, IBinder binder) : this(owner, binder, (object)null)
         {
+        }
+
+        public BindingContext(object owner, IBinder binder, object dataContext)
+        {
+            this.owner = owner;
             this.binder = binder;
             this.DataContext = dataContext;
         }
 
-        public BindingContext(IBinder binder, IDictionary<object, IEnumerable<BindingDescription>> firstBindings) : this(binder, null, firstBindings)
+        public BindingContext(object owner, IBinder binder, IDictionary<object, IEnumerable<BindingDescription>> firstBindings) : this(owner, binder, null, firstBindings)
         {
         }
 
-        public BindingContext(IBinder binder, object dataContext, IDictionary<object, IEnumerable<BindingDescription>> firstBindings)
+        public BindingContext(object owner, IBinder binder, object dataContext, IDictionary<object, IEnumerable<BindingDescription>> firstBindings)
         {
+            this.owner = owner;
             this.binder = binder;
             this.DataContext = dataContext;
 
@@ -56,6 +87,8 @@ namespace Loxodon.Framework.Binding.Contexts
         {
             get { return this.binder; }
         }
+
+        public object Owner { get { return this.owner; } }
 
         public object DataContext
         {
@@ -126,6 +159,7 @@ namespace Loxodon.Framework.Binding.Contexts
                 return;
 
             List<IBinding> list = this.GetOrCreateList(key);
+            binding.BindingContext = this;
             list.Add(binding);
         }
 
@@ -135,18 +169,22 @@ namespace Loxodon.Framework.Binding.Contexts
                 return;
 
             List<IBinding> list = this.GetOrCreateList(key);
-            list.AddRange(bindings);
+            foreach (IBinding binding in bindings)
+            {
+                binding.BindingContext = this;
+                list.Add(binding);
+            }
         }
 
         public virtual void Add(object target, BindingDescription description, object key = null)
         {
-            IBinding binding = this.Binder.Bind(this.DataContext, target, description);
+            IBinding binding = this.Binder.Bind(this, this.DataContext, target, description);
             this.Add(binding, key);
         }
 
         public virtual void Add(object target, IEnumerable<BindingDescription> descriptions, object key = null)
         {
-            IEnumerable<IBinding> bindings = this.Binder.Bind(this.DataContext, target, descriptions);
+            IEnumerable<IBinding> bindings = this.Binder.Bind(this, this.DataContext, target, descriptions);
             this.Add(bindings, key);
         }
 
@@ -188,6 +226,8 @@ namespace Loxodon.Framework.Binding.Contexts
                 if (disposing)
                 {
                     this.Clear();
+                    this.owner = null;
+                    this.binder = null;
                 }
                 disposed = true;
             }

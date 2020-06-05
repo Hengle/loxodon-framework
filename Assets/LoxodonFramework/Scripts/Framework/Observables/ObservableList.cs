@@ -1,21 +1,52 @@
-﻿using System;
+﻿/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
+using System;
 using System.Threading;
 using System.Collections;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Collections.Specialized;
 
 #if NETFX_CORE
 using System.Reflection;
 #endif
+
+using NotifyCollectionChangedEventHandler = System.Collections.Specialized.NotifyCollectionChangedEventHandler;
+using INotifyCollectionChanged = System.Collections.Specialized.INotifyCollectionChanged;
+using NotifyCollectionChangedAction = System.Collections.Specialized.NotifyCollectionChangedAction;
+using NotifyCollectionChangedEventArgs = System.Collections.Specialized.NotifyCollectionChangedEventArgs;
+using INotifyPropertyChanged = System.ComponentModel.INotifyPropertyChanged;
+using PropertyChangedEventArgs = System.ComponentModel.PropertyChangedEventArgs;
+using PropertyChangedEventHandler = System.ComponentModel.PropertyChangedEventHandler;
 
 namespace Loxodon.Framework.Observables
 {
     [Serializable]
     public class ObservableList<T> : IList<T>, IList, INotifyCollectionChanged, INotifyPropertyChanged
     {
-        private const string CountString = "Count";
-        private const string IndexerName = "Item[]";
+        private static readonly PropertyChangedEventArgs CountEventArgs = new PropertyChangedEventArgs("Count");
+        private static readonly PropertyChangedEventArgs IndexerEventArgs = new PropertyChangedEventArgs("Item[]");
+
         private readonly object propertyChangedLock = new object();
         private readonly object collectionChangedLock = new object();
         private PropertyChangedEventHandler propertyChanged;
@@ -154,6 +185,37 @@ namespace Loxodon.Framework.Observables
             MoveItem(oldIndex, newIndex);
         }
 
+        public void AddRange(IEnumerable<T> collection)
+        {
+            if (items.IsReadOnly)
+                throw new NotSupportedException("ReadOnlyCollection");
+
+            int index = items.Count;
+            InsertItem(index, collection);
+        }
+
+        public void InsertRange(int index, IEnumerable<T> collection)
+        {
+            if (items.IsReadOnly)
+                throw new NotSupportedException("ReadOnlyCollection");
+
+            if (index < 0 || index > items.Count)
+                throw new ArgumentOutOfRangeException(string.Format("ArgumentOutOfRangeException:{0}", index));
+
+            InsertItem(index, collection);
+        }
+
+        public void RemoveRange(int index, int count)
+        {
+            if (items.IsReadOnly)
+                throw new NotSupportedException("ReadOnlyCollection");
+
+            if (index < 0 || index >= items.Count)
+                throw new ArgumentOutOfRangeException(string.Format("ArgumentOutOfRangeException:{0}", index));
+
+            RemoveItem(index, count);
+        }
+
         bool ICollection<T>.IsReadOnly
         {
             get { return items.IsReadOnly; }
@@ -180,7 +242,8 @@ namespace Loxodon.Framework.Observables
                     {
                         this.syncRoot = c.SyncRoot;
                     }
-                    else {
+                    else
+                    {
                         Interlocked.CompareExchange<Object>(ref this.syncRoot, new Object(), null);
                     }
                 }
@@ -210,7 +273,8 @@ namespace Loxodon.Framework.Observables
             {
                 items.CopyTo(tArray, index);
             }
-            else {
+            else
+            {
                 Type targetType = array.GetType().GetElementType();
                 Type sourceType = typeof(T);
                 if (!(targetType.IsAssignableFrom(sourceType) || sourceType.IsAssignableFrom(targetType)))
@@ -341,8 +405,8 @@ namespace Loxodon.Framework.Observables
         {
             CheckReentrancy();
             items.Clear();
-            OnPropertyChanged(CountString);
-            OnPropertyChanged(IndexerName);
+            OnPropertyChanged(CountEventArgs);
+            OnPropertyChanged(IndexerEventArgs);
             OnCollectionReset();
         }
 
@@ -353,9 +417,22 @@ namespace Loxodon.Framework.Observables
 
             items.RemoveAt(index);
 
-            OnPropertyChanged(CountString);
-            OnPropertyChanged(IndexerName);
+            OnPropertyChanged(CountEventArgs);
+            OnPropertyChanged(IndexerEventArgs);
             OnCollectionChanged(NotifyCollectionChangedAction.Remove, removedItem, index);
+        }
+
+        protected virtual void RemoveItem(int index, int count)
+        {
+            CheckReentrancy();
+
+            List<T> list = items as List<T>;
+            List<T> changedItems = list.GetRange(index, count);
+            list.RemoveRange(index, count);
+
+            OnPropertyChanged(CountEventArgs);
+            OnPropertyChanged(IndexerEventArgs);
+            OnCollectionChanged(NotifyCollectionChangedAction.Remove, changedItems, index);
         }
 
         protected virtual void InsertItem(int index, T item)
@@ -364,9 +441,20 @@ namespace Loxodon.Framework.Observables
 
             items.Insert(index, item);
 
-            OnPropertyChanged(CountString);
-            OnPropertyChanged(IndexerName);
+            OnPropertyChanged(CountEventArgs);
+            OnPropertyChanged(IndexerEventArgs);
             OnCollectionChanged(NotifyCollectionChangedAction.Add, item, index);
+        }
+
+        protected virtual void InsertItem(int index, IEnumerable<T> collection)
+        {
+            CheckReentrancy();
+
+            (items as List<T>).InsertRange(index, collection);
+
+            OnPropertyChanged(CountEventArgs);
+            OnPropertyChanged(IndexerEventArgs);
+            OnCollectionChanged(NotifyCollectionChangedAction.Add, ToList(collection), index);
         }
 
         protected virtual void SetItem(int index, T item)
@@ -376,7 +464,7 @@ namespace Loxodon.Framework.Observables
 
             items[index] = item;
 
-            OnPropertyChanged(IndexerName);
+            OnPropertyChanged(IndexerEventArgs);
             OnCollectionChanged(NotifyCollectionChangedAction.Replace, originalItem, item, index);
         }
 
@@ -389,7 +477,7 @@ namespace Loxodon.Framework.Observables
             items.RemoveAt(oldIndex);
             items.Insert(newIndex, removedItem);
 
-            OnPropertyChanged(IndexerName);
+            OnPropertyChanged(IndexerEventArgs);
             OnCollectionChanged(NotifyCollectionChangedAction.Move, removedItem, newIndex, oldIndex);
         }
 
@@ -428,34 +516,49 @@ namespace Loxodon.Framework.Observables
             }
         }
 
+        private IList ToList(IEnumerable<T> collection)
+        {
+            if (collection is IList)
+                return (IList)collection;
+
+            List<T> list = new List<T>();
+            list.AddRange(collection);
+            return list;
+        }
+
         private static bool IsCompatibleObject(object value)
         {
             return ((value is T) || (value == null && default(T) == null));
         }
 
-        private void OnPropertyChanged(string propertyName)
-        {
-            OnPropertyChanged(new PropertyChangedEventArgs(propertyName));
-        }
-
         private void OnCollectionChanged(NotifyCollectionChangedAction action, object item, int index)
         {
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(action, item, index));
+            if (this.collectionChanged != null)
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(action, item, index));
+        }
+
+        private void OnCollectionChanged(NotifyCollectionChangedAction action, IList changedItems, int index)
+        {
+            if (this.collectionChanged != null)
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(action, changedItems, index));
         }
 
         private void OnCollectionChanged(NotifyCollectionChangedAction action, object item, int index, int oldIndex)
         {
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(action, item, index, oldIndex));
+            if (this.collectionChanged != null)
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(action, item, index, oldIndex));
         }
 
         private void OnCollectionChanged(NotifyCollectionChangedAction action, object oldItem, object newItem, int index)
         {
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(action, newItem, oldItem, index));
+            if (this.collectionChanged != null)
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(action, newItem, oldItem, index));
         }
 
         private void OnCollectionReset()
         {
-            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+            if (this.collectionChanged != null)
+                OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
         }
 
         [Serializable()]

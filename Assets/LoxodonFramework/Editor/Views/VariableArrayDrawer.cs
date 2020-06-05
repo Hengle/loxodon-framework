@@ -1,5 +1,30 @@
-﻿using Loxodon.Framework.Views.Variables;
+﻿/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
+using Loxodon.Framework.Views.Variables;
 using UnityEditor;
+using UnityEditorInternal;
 using UnityEngine;
 
 namespace Loxodon.Framework.Editors
@@ -9,97 +34,94 @@ namespace Loxodon.Framework.Editors
     {
         private const float HORIZONTAL_GAP = 5;
         private const float VERTICAL_GAP = 5;
-        private const float INDENTATION = 10;
 
-        private bool foldOut = true;
+        private ReorderableList list;
+
+        private ReorderableList GetList(SerializedProperty property)
+        {
+            if (list == null)
+            {
+                list = new ReorderableList(property.serializedObject, property, true, true, true, true);
+                list.elementHeight = 21;
+                list.drawElementCallback = DrawElement;
+                list.drawHeaderCallback = DrawHeader;
+                list.onAddDropdownCallback = OnAddElement;
+                list.onRemoveCallback = OnRemoveElement;
+                list.drawElementBackgroundCallback = DrawElementBackground;
+            }
+            else
+            {
+                list.serializedProperty = property;
+            }
+            return list;
+        }
+
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
             float height = base.GetPropertyHeight(property, label) + 60;
             var variables = property.FindPropertyRelative("variables");
             for (int i = 0; i < variables.arraySize; i++)
-            {
                 height += EditorGUI.GetPropertyHeight(variables.GetArrayElementAtIndex(i)) + VERTICAL_GAP;
-            }
             return height;
         }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
-            EditorGUI.BeginProperty(position, label, property);
-            var variables = property.FindPropertyRelative("variables");
-            float height = base.GetPropertyHeight(property, label);
+            var list = GetList(property.FindPropertyRelative("variables"));
+            list.DoList(position);
+        }
 
-            float y = position.y;
-            float x = position.x;
+        private void OnAddElement(Rect rect, ReorderableList list)
+        {
+            var variables = list.serializedProperty;
+            int index = variables.arraySize > 0 ? variables.arraySize : 0;
+            this.DrawContextMenu(variables, index);
+        }
 
-            Rect foldOutRect = new Rect(x, y, position.width, height);           
-            foldOut = EditorGUI.Foldout(foldOutRect, foldOut, new GUIContent(property.displayName, ""));
-            if (foldOut)
+        private void OnRemoveElement(ReorderableList list)
+        {
+            var variables = list.serializedProperty;
+            AskRemoveVariable(variables, list.index);
+        }
+
+        private void DrawElementBackground(Rect rect, int index, bool isActive, bool isFocused)
+        {
+            ReorderableList.defaultBehaviours.DrawElementBackground(rect, index, isActive, false, true);
+        }
+
+        private void DrawHeader(Rect rect)
+        {
+            GUI.Label(rect, "Variables");
+        }
+
+        private void DrawElement(Rect rect, int index, bool isActive, bool isFocused)
+        {
+            var variables = list.serializedProperty;
+            if (index < 0 || index >= variables.arraySize)
+                return;
+
+            var variable = variables.GetArrayElementAtIndex(index);
+
+            float x = rect.x;
+            float y = rect.y + 2;
+            float width = rect.width - 40;
+            float height = rect.height;
+
+            Rect variableRect = new Rect(x, y, width, height);
+            EditorGUI.PropertyField(variableRect, variable, GUIContent.none);
+
+            var buttonLeftRect = new Rect(variableRect.xMax + HORIZONTAL_GAP, y - 1, 18, 18);
+            var buttonRightRect = new Rect(buttonLeftRect.xMax, y - 1, 18, 18);
+
+            if (GUI.Button(buttonLeftRect, new GUIContent("+"), EditorStyles.miniButtonLeft))
             {
-
-                y += height + VERTICAL_GAP;
-                Rect buttonLeftRect = new Rect(x, y, 50, height);
-                Rect buttonRightRect = new Rect(buttonLeftRect.xMax, y, 50, height);
-
-                if (GUI.Button(buttonLeftRect, new GUIContent("+"), EditorStyles.miniButtonLeft))
-                {
-                    int index = variables.arraySize > 0 ? variables.arraySize : 0;
-                    this.DrawContextMenu(variables, index);
-                }
-                if (GUI.Button(buttonRightRect, new GUIContent("-"), EditorStyles.miniButtonRight))
-                {
-                    int index = variables.arraySize > 0 ? variables.arraySize - 1 : -1;
-                    RemoveVariable(variables, index);
-                }
-
-                x += INDENTATION;
-
-                float width = Mathf.Max(position.xMax - x - 50, 320);
-                if (variables.arraySize > 0)
-                {
-                    y += height + VERTICAL_GAP;
-
-                    Rect nameRect = new Rect(x, y, Mathf.Min(200, width * 0.4f), height);
-                    Rect typeRect = new Rect(nameRect.xMax + HORIZONTAL_GAP, y, Mathf.Min(120, width * 0.2f), height);
-                    Rect valueRect = new Rect(typeRect.xMax + HORIZONTAL_GAP, y, position.xMax - typeRect.xMax - HORIZONTAL_GAP, height);
-
-                    EditorGUI.LabelField(nameRect, new GUIContent("Name", ""));
-                    EditorGUI.LabelField(typeRect, new GUIContent("Type", ""));
-                    EditorGUI.LabelField(valueRect, new GUIContent("Value", ""));
-
-                    y += height + VERTICAL_GAP;
-
-                    Handles.BeginGUI();
-                    Handles.color = new Color(0.5f, 0.5f, 0.5f, 0.5f);
-                    Handles.DrawLine(new Vector3(x, y), new Vector3(position.xMax, y));
-                    Handles.EndGUI();
-                }
-
-                y += VERTICAL_GAP;
-                for (int i = 0; i < variables.arraySize; i++)
-                {
-                    var variable = variables.GetArrayElementAtIndex(i);
-                    Rect variableRect = new Rect(x, y, width, EditorGUI.GetPropertyHeight(variable));
-                    EditorGUI.PropertyField(variableRect, variable, GUIContent.none);
-
-                    buttonLeftRect = new Rect(variableRect.xMax + HORIZONTAL_GAP, y, 20, variableRect.height);
-                    buttonRightRect = new Rect(buttonLeftRect.xMax, y, 20, variableRect.height);
-
-                    if (GUI.Button(buttonLeftRect, new GUIContent("+"), EditorStyles.miniButtonLeft))
-                    {
-                        DuplicateVariable(variables, i);
-                    }
-                    if (GUI.Button(buttonRightRect, new GUIContent("-"), EditorStyles.miniButtonRight))
-                    {
-                        RemoveVariable(variables, i);
-                    }
-
-                    y += variableRect.height + VERTICAL_GAP;
-                }
+                DuplicateVariable(variables, index);
             }
-
-            EditorGUI.EndProperty();
+            if (GUI.Button(buttonRightRect, new GUIContent("-"), EditorStyles.miniButtonRight))
+            {
+                AskRemoveVariable(variables, index);
+            }
         }
 
         protected virtual void DrawContextMenu(SerializedProperty variables, int index)
@@ -120,6 +142,7 @@ namespace Loxodon.Framework.Editors
         {
             if (index < 0 || index > variables.arraySize)
                 return;
+
             variables.serializedObject.Update();
             variables.InsertArrayElementAtIndex(index);
             SerializedProperty variableProperty = variables.GetArrayElementAtIndex(index);
@@ -135,11 +158,12 @@ namespace Loxodon.Framework.Editors
 
         protected virtual void DuplicateVariable(SerializedProperty variables, int index)
         {
-            if (index < 0 || index > variables.arraySize - 1)
+            if (index < 0 || index >= variables.arraySize)
                 return;
+
             variables.serializedObject.Update();
             variables.InsertArrayElementAtIndex(index);
-            SerializedProperty variableProperty = variables.GetArrayElementAtIndex(index+1);
+            SerializedProperty variableProperty = variables.GetArrayElementAtIndex(index + 1);
 
             variableProperty.FindPropertyRelative("name").stringValue = "";
             variableProperty.FindPropertyRelative("objectValue").objectReferenceValue = null;
@@ -149,9 +173,28 @@ namespace Loxodon.Framework.Editors
             GUI.FocusControl(null);
         }
 
+        protected virtual void AskRemoveVariable(SerializedProperty variables, int index)
+        {
+            if (variables == null || index < 0 || index >= variables.arraySize)
+                return;
+
+            var variable = variables.GetArrayElementAtIndex(index);
+            var name = variable.FindPropertyRelative("name").stringValue;
+            if (string.IsNullOrEmpty(name))
+            {
+                RemoveVariable(variables, index);
+                return;
+            }
+
+            if (EditorUtility.DisplayDialog("Confirm delete", string.Format("Are you sure you want to delete the item named \"{0}\"?", name), "Yes", "Cancel"))
+            {
+                RemoveVariable(variables, index);
+            }
+        }
+
         protected virtual void RemoveVariable(SerializedProperty variables, int index)
         {
-            if (index < 0)
+            if (index < 0 || index >= variables.arraySize)
                 return;
 
             variables.serializedObject.Update();

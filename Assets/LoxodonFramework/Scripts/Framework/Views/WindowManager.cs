@@ -1,7 +1,34 @@
-﻿using System;
+﻿/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+#if NETFX_CORE
+using System.Reflection;
+#endif
 
 using Loxodon.Log;
 using Loxodon.Framework.Asynchronous;
@@ -39,6 +66,8 @@ namespace Loxodon.Framework.Views
 
         public int Count { get { return this.windows.Count; } }
 
+        public int VisibleCount { get { return this.windows.FindAll(w => w.Visibility).Count; } }
+
         public virtual IWindow Current
         {
             get
@@ -51,16 +80,23 @@ namespace Loxodon.Framework.Views
             }
         }
 
-        public virtual IWindow Second
+        public virtual IWindow GetVisibleWindow(int index)
         {
-            get
+            if (this.windows == null || this.windows.Count <= 1)
+                return null;
+
+            int currIndex = -1;
+            var ie = this.Visibles();
+            while (ie.MoveNext())
             {
-                if (this.windows == null || this.windows.Count <= 1)
+                currIndex++;
+                if (currIndex > index)
                     return null;
 
-                IWindow window = this.windows[1];
-                return window != null && window.Visibility ? window : null;
+                if (currIndex == index)
+                    return ie.Current;
             }
+            return null;
         }
 
         protected virtual void OnEnable()
@@ -93,9 +129,13 @@ namespace Loxodon.Framework.Views
 
         public virtual void Clear()
         {
-            for (int i = this.windows.Count; i > 0; i--)
+            for (int i = 0; i < this.windows.Count; i++)
             {
-                this.windows[0].Dismiss(true);
+                try
+                {
+                    this.windows[i].Dismiss(true);
+                }
+                catch (Exception) { }
             }
             this.windows.Clear();
         }
@@ -174,23 +214,31 @@ namespace Loxodon.Framework.Views
 
         protected virtual void MoveToFirst(IWindow window)
         {
+            this.MoveToIndex(window, 0);            
+        }
+
+        protected virtual void MoveToIndex(IWindow window, int index)
+        {
             if (window == null)
                 throw new ArgumentNullException("window");
 
             try
             {
-                int index = this.IndexOf(window);
-                if (index < 0 || index == 0)
+                int oldIndex = this.IndexOf(window);
+                if (oldIndex < 0 || oldIndex == index)
                     return;
 
-                this.windows.RemoveAt(index);
-                this.windows.Insert(0, window);
+                this.windows.RemoveAt(oldIndex);
+                this.windows.Insert(index, window);
             }
             finally
             {
                 var view = window as UIView;
                 if (view != null && view.Transform != null)
-                    view.Transform.SetAsLastSibling();
+                {
+                    int maxIndex = this.windows.Count - 1;
+                    view.Transform.SetSiblingIndex(maxIndex - index);
+                }
             }
         }
 
@@ -204,14 +252,41 @@ namespace Loxodon.Framework.Views
             return this.windows.FindAll(w => w.Visibility == visible);
         }
 
+        public virtual IWindow Find(Type windowType)
+        {
+            if (windowType == null)
+                return null;
+
+            return this.windows.Find(w => windowType.IsAssignableFrom(w.GetType()));
+        }
+
         public virtual T Find<T>() where T : IWindow
         {
             return (T)this.windows.Find(w => w is T);
         }
 
+        public virtual IWindow Find(string name, Type windowType)
+        {
+            if (name == null || windowType == null)
+                return null;
+
+            return this.windows.Find(w => windowType.IsAssignableFrom(w.GetType()) && w.Name.Equals(name));
+        }
+
         public virtual T Find<T>(string name) where T : IWindow
         {
             return (T)this.windows.Find(w => w is T && w.Name.Equals(name));
+        }
+
+        public virtual List<IWindow> FindAll(Type windowType)
+        {
+            List<IWindow> list = new List<IWindow>();
+            foreach (IWindow window in this.windows)
+            {
+                if (windowType.IsAssignableFrom(window.GetType()))
+                    list.Add(window);
+            }
+            return list;
         }
 
         public virtual List<T> FindAll<T>() where T : IWindow
@@ -251,8 +326,6 @@ namespace Loxodon.Framework.Views
             t.SetParent(null, worldPositionStays);
         }
 
-
-
         public ITransition Show(IWindow window)
         {
             ShowTransition transition = new ShowTransition(this, (Window)window);
@@ -261,10 +334,10 @@ namespace Loxodon.Framework.Views
                 {
                     /* Control the layer of the window */
                     if (state == WindowState.VISIBLE)
-                        this.MoveToFirst(w);
+                        this.MoveToIndex(w, transition.Layer);
 
-                    if (state == WindowState.INVISIBLE)
-                        this.MoveToLast(w);
+                    //if (state == WindowState.INVISIBLE)
+                    //    this.MoveToLast(w);
                 });
         }
 
@@ -275,9 +348,6 @@ namespace Loxodon.Framework.Views
             return transition.OnStateChanged((w, state) =>
                 {
                     /* Control the layer of the window */
-                    if (state == WindowState.VISIBLE)
-                        this.MoveToFirst(w);
-
                     if (state == WindowState.INVISIBLE)
                         this.MoveToLast(w);
                 });
@@ -290,9 +360,6 @@ namespace Loxodon.Framework.Views
             return transition.OnStateChanged((w, state) =>
                 {
                     /* Control the layer of the window */
-                    if (state == WindowState.VISIBLE)
-                        this.MoveToFirst(w);
-
                     if (state == WindowState.INVISIBLE)
                         this.MoveToLast(w);
                 });
@@ -374,7 +441,16 @@ namespace Loxodon.Framework.Views
             protected override IEnumerator DoTransition()
             {
                 Window current = this.Window;
-                Window previous = this.manager.Current as Window;
+                int layer = (this.Layer < 0 || current.WindowType == WindowType.DIALOG || current.WindowType == WindowType.PROGRESS) ? 0 : this.Layer;
+                if (layer > 0)
+                {
+                    int visibleCount = this.manager.VisibleCount;
+                    if (layer > visibleCount)
+                        layer = visibleCount;
+                }
+                this.Layer = layer;
+
+                Window previous = (Window)this.manager.GetVisibleWindow(layer);// this.manager.Current as Window;
                 if (previous != null)
                 {
                     //Passivate the previous window

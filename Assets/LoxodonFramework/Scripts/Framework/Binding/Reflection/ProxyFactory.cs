@@ -1,212 +1,79 @@
-﻿using System;
-using System.Reflection;
+﻿/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
+using System;
 using System.Collections.Generic;
 
 namespace Loxodon.Framework.Binding.Reflection
 {
-    public class ProxyFactory : IProxyFactory, IProxyRegistry
+    public class ProxyFactory
     {
         public static readonly ProxyFactory Default = new ProxyFactory();
 
+        private readonly object _lock = new object();
         private readonly Dictionary<Type, ProxyType> types = new Dictionary<Type, ProxyType>();
 
-        protected ProxyFactory()
+        public IProxyType Get(Type type)
         {
+            return GetType(type);
         }
 
-        public IProxyType Create(Type type)
+        protected virtual ProxyType GetType(Type type)
         {
-            return GetProxyType(type);
+            ProxyType ret;
+            if (this.types.TryGetValue(type, out ret) && ret != null)
+                return ret;
+
+            return Create(type);
         }
 
-        public void Register(IProxyFieldInfo info)
+        public void Register(IProxyMemberInfo proxyMemberInfo)
         {
-            if (info == null)
+            if (proxyMemberInfo == null)
                 return;
 
-            ProxyType proxyType = GetProxyType(info.DeclaringType);
-            proxyType.Add(info);
+            ProxyType proxyType = this.GetType(proxyMemberInfo.DeclaringType);
+            proxyType.Register(proxyMemberInfo);
         }
 
-        public void Register(IProxyPropertyInfo info)
+        public void Unregister(IProxyMemberInfo proxyMemberInfo)
         {
-            if (info == null)
+            if (proxyMemberInfo == null)
                 return;
 
-            ProxyType proxyType = GetProxyType(info.DeclaringType);
-            proxyType.Add(info);
+            ProxyType proxyType = this.GetType(proxyMemberInfo.DeclaringType);
+            proxyType.Unregister(proxyMemberInfo);
         }
 
-        public void Register(IProxyMethodInfo info)
+        protected ProxyType Create(Type type)
         {
-            if (info == null)
-                return;
-
-            ProxyType proxyType = GetProxyType(info.DeclaringType);
-            proxyType.Add(info);
-        }
-
-        internal ProxyType GetProxyType(Type type)
-        {
-            ProxyType proxyType;
-            if (types.TryGetValue(type, out proxyType))
+            lock (_lock)
+            {
+                ProxyType proxyType = new ProxyType(type, this);
+                this.types.Add(type, proxyType);
                 return proxyType;
-
-            proxyType = new ProxyType(type, this);
-            types[type] = proxyType;
-            return proxyType;
-        }
-
-        internal IProxyFieldInfo Create(FieldInfo info)
-        {
-#if UNITY_IOS
-            return new ProxyFieldInfo(info);
-#else
-            try
-            {
-                return (IProxyFieldInfo)Activator.CreateInstance(typeof(ProxyFieldInfo<,>).MakeGenericType(info.DeclaringType, info.FieldType), info);
             }
-            catch (Exception)
-            {
-                return new ProxyFieldInfo(info);
-            }
-#endif
-        }
-
-        internal IProxyMethodInfo Create(MethodInfo info)
-        {
-#if UNITY_IOS
-            return new ProxyMethodInfo(info);
-#else
-            try
-            {
-                Type returnType = info.ReturnType;
-                ParameterInfo[] parameters = info.GetParameters();
-                Type type = info.DeclaringType;
-                if (typeof(void).Equals(returnType))
-                {
-                    if (info.IsStatic)
-                    {
-                        if (parameters == null || parameters.Length == 0)
-                        {
-                            return (IProxyMethodInfo)Activator.CreateInstance(typeof(StaticProxyActionInfo<>).MakeGenericType(type), info);
-                        }
-                        else if (parameters.Length == 1)
-                        {
-                            return (IProxyMethodInfo)Activator.CreateInstance(typeof(StaticProxyActionInfo<,>).MakeGenericType(type, parameters[0].ParameterType), info);
-                        }
-                        else if (parameters.Length == 2)
-                        {
-                            return (IProxyMethodInfo)Activator.CreateInstance(typeof(StaticProxyActionInfo<,,>).MakeGenericType(type, parameters[0].ParameterType, parameters[1].ParameterType), info);
-                        }
-                        else if (parameters.Length == 3)
-                        {
-                            return (IProxyMethodInfo)Activator.CreateInstance(typeof(StaticProxyActionInfo<,,,>).MakeGenericType(type, parameters[0].ParameterType, parameters[1].ParameterType, parameters[2].ParameterType), info);
-                        }
-                    }
-                    else
-                    {
-                        if (parameters == null || parameters.Length == 0)
-                        {
-                            return (IProxyMethodInfo)Activator.CreateInstance(typeof(ProxyActionInfo<>).MakeGenericType(type), info);
-                        }
-                        else if (parameters.Length == 1)
-                        {
-                            return (IProxyMethodInfo)Activator.CreateInstance(typeof(ProxyActionInfo<,>).MakeGenericType(type, parameters[0].ParameterType), info);
-                        }
-                        else if (parameters.Length == 2)
-                        {
-                            return (IProxyMethodInfo)Activator.CreateInstance(typeof(ProxyActionInfo<,,>).MakeGenericType(type, parameters[0].ParameterType, parameters[1].ParameterType), info);
-                        }
-                        else if (parameters.Length == 3)
-                        {
-                            return (IProxyMethodInfo)Activator.CreateInstance(typeof(ProxyActionInfo<,,,>).MakeGenericType(type, parameters[0].ParameterType, parameters[1].ParameterType, parameters[2].ParameterType), info);
-                        }
-                    }
-
-                    return new ProxyMethodInfo(info);
-                }
-                else
-                {
-                    if (info.IsStatic)
-                    {
-                        if (parameters == null || parameters.Length == 0)
-                        {
-                            return (IProxyMethodInfo)Activator.CreateInstance(typeof(StaticProxyFuncInfo<,>).MakeGenericType(type, returnType), info);
-                        }
-                        else if (parameters.Length == 1)
-                        {
-                            return (IProxyMethodInfo)Activator.CreateInstance(typeof(StaticProxyFuncInfo<,,>).MakeGenericType(type, parameters[0].ParameterType, returnType), info);
-                        }
-                        else if (parameters.Length == 2)
-                        {
-                            return (IProxyMethodInfo)Activator.CreateInstance(typeof(StaticProxyFuncInfo<,,,>).MakeGenericType(type, parameters[0].ParameterType, parameters[1].ParameterType, returnType), info);
-                        }
-                        else if (parameters.Length == 3)
-                        {
-                            return (IProxyMethodInfo)Activator.CreateInstance(typeof(StaticProxyFuncInfo<,,,,>).MakeGenericType(type, parameters[0].ParameterType, parameters[1].ParameterType, parameters[2].ParameterType, returnType), info);
-                        }
-                    }
-                    else
-                    {
-                        if (parameters == null || parameters.Length == 0)
-                        {
-                            return (IProxyMethodInfo)Activator.CreateInstance(typeof(ProxyFuncInfo<,>).MakeGenericType(type, returnType), info);
-                        }
-                        else if (parameters.Length == 1)
-                        {
-                            return (IProxyMethodInfo)Activator.CreateInstance(typeof(ProxyFuncInfo<,,>).MakeGenericType(type, parameters[0].ParameterType, returnType), info);
-                        }
-                        else if (parameters.Length == 2)
-                        {
-                            return (IProxyMethodInfo)Activator.CreateInstance(typeof(ProxyFuncInfo<,,,>).MakeGenericType(type, parameters[0].ParameterType, parameters[1].ParameterType, returnType), info);
-                        }
-                        else if (parameters.Length == 3)
-                        {
-                            return (IProxyMethodInfo)Activator.CreateInstance(typeof(ProxyFuncInfo<,,,,>).MakeGenericType(type, parameters[0].ParameterType, parameters[1].ParameterType, parameters[2].ParameterType, returnType), info);
-                        }
-                    }
-
-                    return new ProxyMethodInfo(info);
-                }
-            }
-            catch (Exception)
-            {
-                return new ProxyMethodInfo(info);
-            }
-#endif
-        }
-
-        internal IProxyPropertyInfo Create(PropertyInfo info)
-        {
-#if UNITY_IOS
-            return new ProxyPropertyInfo(info);
-#else            
-            try
-            {
-                Type type = info.DeclaringType;
-                if (info.IsStatic())
-                {
-                    ParameterInfo[] parameters = info.GetIndexParameters();
-                    if (parameters != null && parameters.Length > 0)
-                        throw new NotSupportedException();
-
-                    return (IProxyPropertyInfo)Activator.CreateInstance(typeof(StaticProxyPropertyInfo<,>).MakeGenericType(type, info.PropertyType), info);
-                }
-                else
-                {
-                    ParameterInfo[] parameters = info.GetIndexParameters();
-                    if (parameters != null && parameters.Length == 1)
-                        return (IProxyPropertyInfo)Activator.CreateInstance(typeof(ProxyPropertyInfo<,,>).MakeGenericType(type, parameters[0].ParameterType, info.PropertyType), info);
-
-                    return (IProxyPropertyInfo)Activator.CreateInstance(typeof(ProxyPropertyInfo<,>).MakeGenericType(type, info.PropertyType), info);
-                }
-            }
-            catch (Exception)
-            {
-                return new ProxyPropertyInfo(info);
-            }
-#endif
         }
     }
 }

@@ -1,59 +1,69 @@
-﻿using Loxodon.Log;
+﻿/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
+using Loxodon.Log;
 using System;
 using System.Reflection;
 
 namespace Loxodon.Framework.Binding.Reflection
 {
-    public abstract class AbstractProxyMethodInfo : IProxyMethodInfo
+    public class ProxyMethodInfo : IProxyMethodInfo
     {
-        protected readonly MethodInfo methodInfo;
         protected bool isValueType = false;
-        public AbstractProxyMethodInfo(MethodInfo info)
+        protected MethodInfo methodInfo;
+        public ProxyMethodInfo(MethodInfo methodInfo)
         {
-            if (info == null)
-                throw new ArgumentNullException("Parameters' info 'cannot be null!");
+            if (methodInfo == null)
+                throw new ArgumentNullException("methodInfo");
 
-            this.methodInfo = info;
-
+            this.methodInfo = methodInfo;
 #if NETFX_CORE
-            this.isValueType = info.DeclaringType.GetTypeInfo().IsValueType;
+            this.isValueType = methodInfo.DeclaringType.GetTypeInfo().IsValueType;
 #else
-            this.isValueType = info.DeclaringType.IsValueType;
+            this.isValueType = methodInfo.DeclaringType.IsValueType;
 #endif
         }
 
-        public MethodInfo MethodInfo { get { return this.methodInfo; } }
+        public virtual Type DeclaringType { get { return this.methodInfo.DeclaringType; } }
 
-        public bool IsStatic { get { return this.methodInfo.IsStatic; } }
+        public virtual string Name { get { return this.methodInfo.Name; } }
 
-        public string Name { get { return this.methodInfo.Name; } }
+        public virtual bool IsStatic { get { return this.methodInfo.IsStatic; } }
 
-        public Type DeclaringType { get { return this.methodInfo.DeclaringType; } }
+        public virtual Type ReturnType { get { return this.methodInfo.ReturnType; } }
 
-        public Type ReturnType { get { return this.methodInfo.ReturnType; } }
+        public virtual ParameterInfo[] Parameters { get { return this.methodInfo.GetParameters(); } }
 
-        public ParameterInfo[] Parameters { get { return this.methodInfo.GetParameters(); } }
+        public virtual ParameterInfo ReturnParameter { get { return this.methodInfo.ReturnParameter; } }
 
-        public ParameterInfo ReturnParameter { get { return this.methodInfo.ReturnParameter; } }
-
-        public abstract object Invoke(object target, params object[] args);
-    }
-
-    public class ProxyMethodInfo : AbstractProxyMethodInfo
-    {
-        public ProxyMethodInfo(MethodInfo info) : base(info)
-        {
-            if (this.methodInfo.IsStatic)
-                throw new ArgumentException("The method is static!");
-        }
-
-        public override object Invoke(object target, params object[] args)
+        public virtual object Invoke(object target, params object[] args)
         {
             return this.methodInfo.Invoke(target, args);
         }
     }
 
-    public class ProxyFuncInfo<T, TResult> : AbstractProxyMethodInfo, IProxyFuncInfo<T, TResult>
+    public class ProxyFuncInfo<T, TResult> : ProxyMethodInfo, IProxyFuncInfo<T, TResult>
     {
         private static readonly ILog log = LogManager.GetLogger(typeof(ProxyFuncInfo<T, TResult>));
 
@@ -81,7 +91,7 @@ namespace Loxodon.Framework.Binding.Reflection
 
         public ProxyFuncInfo(MethodInfo info, Func<T, TResult> function) : base(info)
         {
-            if (this.methodInfo.IsStatic)
+            if (this.IsStatic)
                 throw new ArgumentException("The method is static!");
 
             if (!typeof(TResult).Equals(this.methodInfo.ReturnType) || !this.methodInfo.DeclaringType.IsAssignableFrom(typeof(T)))
@@ -91,6 +101,8 @@ namespace Loxodon.Framework.Binding.Reflection
             if (this.function == null)
                 this.function = this.MakeFunc(this.methodInfo);
         }
+
+        public override Type DeclaringType { get { return typeof(T); } }
 
         private Func<T, TResult> MakeFunc(MethodInfo methodInfo)
         {
@@ -126,7 +138,7 @@ namespace Loxodon.Framework.Binding.Reflection
         }
     }
 
-    public class ProxyFuncInfo<T, P1, TResult> : AbstractProxyMethodInfo, IProxyFuncInfo<T, P1, TResult>
+    public class ProxyFuncInfo<T, P1, TResult> : ProxyMethodInfo, IProxyFuncInfo<T, P1, TResult>
     {
         private static readonly ILog log = LogManager.GetLogger(typeof(ProxyFuncInfo<T, P1, TResult>));
         private Func<T, P1, TResult> function;
@@ -153,7 +165,7 @@ namespace Loxodon.Framework.Binding.Reflection
 
         public ProxyFuncInfo(MethodInfo info, Func<T, P1, TResult> function) : base(info)
         {
-            if (this.methodInfo.IsStatic)
+            if (this.IsStatic)
                 throw new ArgumentException("The method is static!");
 
             if (!typeof(TResult).Equals(this.methodInfo.ReturnType) || !this.methodInfo.DeclaringType.IsAssignableFrom(typeof(T)))
@@ -167,6 +179,8 @@ namespace Loxodon.Framework.Binding.Reflection
             if (this.function == null)
                 this.function = this.MakeFunc(this.methodInfo);
         }
+
+        public override Type DeclaringType { get { return typeof(T); } }
 
         private Func<T, P1, TResult> MakeFunc(MethodInfo methodInfo)
         {
@@ -202,7 +216,7 @@ namespace Loxodon.Framework.Binding.Reflection
         }
     }
 
-    public class ProxyFuncInfo<T, P1, P2, TResult> : AbstractProxyMethodInfo, IProxyFuncInfo<T, P1, P2, TResult>
+    public class ProxyFuncInfo<T, P1, P2, TResult> : ProxyMethodInfo, IProxyFuncInfo<T, P1, P2, TResult>
     {
         private static readonly ILog log = LogManager.GetLogger(typeof(ProxyFuncInfo<T, P1, P2, TResult>));
         private Func<T, P1, P2, TResult> function;
@@ -230,7 +244,7 @@ namespace Loxodon.Framework.Binding.Reflection
 
         public ProxyFuncInfo(MethodInfo info, Func<T, P1, P2, TResult> function) : base(info)
         {
-            if (this.methodInfo.IsStatic)
+            if (this.IsStatic)
                 throw new ArgumentException("The method is static!");
 
             if (!typeof(TResult).Equals(this.methodInfo.ReturnType) || !this.methodInfo.DeclaringType.IsAssignableFrom(typeof(T)))
@@ -244,6 +258,8 @@ namespace Loxodon.Framework.Binding.Reflection
             if (this.function == null)
                 this.function = this.MakeFunc(this.methodInfo);
         }
+
+        public override Type DeclaringType { get { return typeof(T); } }
 
         private Func<T, P1, P2, TResult> MakeFunc(MethodInfo methodInfo)
         {
@@ -279,7 +295,7 @@ namespace Loxodon.Framework.Binding.Reflection
         }
     }
 
-    public class ProxyFuncInfo<T, P1, P2, P3, TResult> : AbstractProxyMethodInfo, IProxyFuncInfo<T, P1, P2, P3, TResult>
+    public class ProxyFuncInfo<T, P1, P2, P3, TResult> : ProxyMethodInfo, IProxyFuncInfo<T, P1, P2, P3, TResult>
     {
         private static readonly ILog log = LogManager.GetLogger(typeof(ProxyFuncInfo<T, P1, P2, P3, TResult>));
         private Func<T, P1, P2, P3, TResult> function;
@@ -306,7 +322,7 @@ namespace Loxodon.Framework.Binding.Reflection
 
         public ProxyFuncInfo(MethodInfo info, Func<T, P1, P2, P3, TResult> function) : base(info)
         {
-            if (this.methodInfo.IsStatic)
+            if (this.IsStatic)
                 throw new ArgumentException("The method is static!");
 
             if (!typeof(TResult).Equals(this.methodInfo.ReturnType) || !this.methodInfo.DeclaringType.IsAssignableFrom(typeof(T)))
@@ -320,6 +336,8 @@ namespace Loxodon.Framework.Binding.Reflection
             if (this.function == null)
                 this.function = this.MakeFunc(this.methodInfo);
         }
+
+        public override Type DeclaringType { get { return typeof(T); } }
 
         private Func<T, P1, P2, P3, TResult> MakeFunc(MethodInfo methodInfo)
         {
@@ -355,7 +373,7 @@ namespace Loxodon.Framework.Binding.Reflection
         }
     }
 
-    public class ProxyActionInfo<T> : AbstractProxyMethodInfo, IProxyActionInfo<T>
+    public class ProxyActionInfo<T> : ProxyMethodInfo, IProxyActionInfo<T>
     {
         private static readonly ILog log = LogManager.GetLogger(typeof(ProxyActionInfo<T>));
         private Action<T> action;
@@ -380,9 +398,11 @@ namespace Loxodon.Framework.Binding.Reflection
         {
         }
 
+        public override Type DeclaringType { get { return typeof(T); } }
+
         public ProxyActionInfo(MethodInfo info, Action<T> action) : base(info)
         {
-            if (this.methodInfo.IsStatic)
+            if (this.IsStatic)
                 throw new ArgumentException("The method is static!");
 
             if (!typeof(void).Equals(this.methodInfo.ReturnType) || !this.methodInfo.DeclaringType.IsAssignableFrom(typeof(T)))
@@ -431,7 +451,7 @@ namespace Loxodon.Framework.Binding.Reflection
         }
     }
 
-    public class ProxyActionInfo<T, P1> : AbstractProxyMethodInfo, IProxyActionInfo<T, P1>
+    public class ProxyActionInfo<T, P1> : ProxyMethodInfo, IProxyActionInfo<T, P1>
     {
         private static readonly ILog log = LogManager.GetLogger(typeof(ProxyActionInfo<T, P1>));
         private Action<T, P1> action;
@@ -458,7 +478,7 @@ namespace Loxodon.Framework.Binding.Reflection
 
         public ProxyActionInfo(MethodInfo info, Action<T, P1> action) : base(info)
         {
-            if (this.methodInfo.IsStatic)
+            if (this.IsStatic)
                 throw new ArgumentException("The method is static!");
 
             if (!typeof(void).Equals(this.methodInfo.ReturnType) || !this.methodInfo.DeclaringType.IsAssignableFrom(typeof(T)))
@@ -472,6 +492,8 @@ namespace Loxodon.Framework.Binding.Reflection
             if (this.action == null)
                 this.action = this.MakeAction(this.methodInfo);
         }
+
+        public override Type DeclaringType { get { return typeof(T); } }
 
         private Action<T, P1> MakeAction(MethodInfo methodInfo)
         {
@@ -511,7 +533,7 @@ namespace Loxodon.Framework.Binding.Reflection
         }
     }
 
-    public class ProxyActionInfo<T, P1, P2> : AbstractProxyMethodInfo, IProxyActionInfo<T, P1, P2>
+    public class ProxyActionInfo<T, P1, P2> : ProxyMethodInfo, IProxyActionInfo<T, P1, P2>
     {
         private static readonly ILog log = LogManager.GetLogger(typeof(ProxyActionInfo<T, P1, P2>));
         private Action<T, P1, P2> action;
@@ -538,7 +560,7 @@ namespace Loxodon.Framework.Binding.Reflection
 
         public ProxyActionInfo(MethodInfo info, Action<T, P1, P2> action) : base(info)
         {
-            if (this.methodInfo.IsStatic)
+            if (this.IsStatic)
                 throw new ArgumentException("The method is static!");
 
             if (!typeof(void).Equals(this.methodInfo.ReturnType) || !this.methodInfo.DeclaringType.IsAssignableFrom(typeof(T)))
@@ -552,6 +574,8 @@ namespace Loxodon.Framework.Binding.Reflection
             if (this.action == null)
                 this.action = this.MakeAction(this.methodInfo);
         }
+
+        public override Type DeclaringType { get { return typeof(T); } }
 
         private Action<T, P1, P2> MakeAction(MethodInfo methodInfo)
         {
@@ -592,7 +616,7 @@ namespace Loxodon.Framework.Binding.Reflection
         }
     }
 
-    public class ProxyActionInfo<T, P1, P2, P3> : AbstractProxyMethodInfo, IProxyActionInfo<T, P1, P2, P3>
+    public class ProxyActionInfo<T, P1, P2, P3> : ProxyMethodInfo, IProxyActionInfo<T, P1, P2, P3>
     {
         private static readonly ILog log = LogManager.GetLogger(typeof(ProxyActionInfo<T, P1, P2, P3>));
         private Action<T, P1, P2, P3> action;
@@ -618,7 +642,7 @@ namespace Loxodon.Framework.Binding.Reflection
 
         public ProxyActionInfo(MethodInfo info, Action<T, P1, P2, P3> action) : base(info)
         {
-            if (this.methodInfo.IsStatic)
+            if (this.IsStatic)
                 throw new ArgumentException("The method is static!");
 
             if (!typeof(void).Equals(this.methodInfo.ReturnType) || !this.methodInfo.DeclaringType.IsAssignableFrom(typeof(T)))
@@ -633,6 +657,8 @@ namespace Loxodon.Framework.Binding.Reflection
                 this.action = this.MakeAction(this.methodInfo);
 
         }
+
+        public override Type DeclaringType { get { return typeof(T); } }
 
         private Action<T, P1, P2, P3> MakeAction(MethodInfo methodInfo)
         {
@@ -671,5 +697,4 @@ namespace Loxodon.Framework.Binding.Reflection
             return null;
         }
     }
-
 }

@@ -1,4 +1,28 @@
-﻿using System;
+﻿/*
+ * MIT License
+ *
+ * Copyright (c) 2018 Clark Yang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of 
+ * this software and associated documentation files (the "Software"), to deal in 
+ * the Software without restriction, including without limitation the rights to 
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies 
+ * of the Software, and to permit persons to whom the Software is furnished to do so, 
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all 
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE 
+ * SOFTWARE.
+ */
+
+using System;
 using System.Collections.Generic;
 
 using Loxodon.Framework.Binding.Paths;
@@ -22,16 +46,24 @@ namespace Loxodon.Framework.Binding.Proxy.Sources.Expressions
             proxy = null;
             var expression = description.Expression;
             List<ISourceProxy> list = new List<ISourceProxy>();
-            if (!description.IsStatic)
+            List<Path> paths = this.pathFinder.FindPaths(expression);
+            foreach (Path path in paths)
             {
-                List<Path> paths = this.pathFinder.FindPaths(expression);
-                foreach (Path path in paths)
+                if (!path.IsStatic)
                 {
-                    ISourceProxy innerProxy = this.factory.CreateProxy(source, new ObjectSourceDescription() { Path = path });
-                    if (innerProxy != null)
-                        list.Add(innerProxy);
+                    if (source == null)
+                        continue;//ignore the path
+
+                    MemberNode memberNode = path[0] as MemberNode;
+                    if (memberNode != null && memberNode.MemberInfo != null && !memberNode.MemberInfo.DeclaringType.IsAssignableFrom(source.GetType()))
+                        continue;//ignore the path
                 }
+
+                ISourceProxy innerProxy = this.factory.CreateProxy(source, new ObjectSourceDescription() { Path = path });
+                if (innerProxy != null)
+                    list.Add(innerProxy);
             }
+
 #if UNITY_IOS
             Func<object[], object> del = expression.DynamicCompile();
             proxy = new ExpressionSourceProxy(description.IsStatic ? null : source, del, description.ReturnType, list);
@@ -47,7 +79,7 @@ namespace Loxodon.Framework.Binding.Proxy.Sources.Expressions
                 }
                 else
                 {
-                    proxy = (ISourceProxy)Activator.CreateInstance(typeof(ExpressionSourceProxy<>).MakeGenericType(returnType), del);
+                    proxy = (ISourceProxy)Activator.CreateInstance(typeof(ExpressionSourceProxy<>).MakeGenericType(returnType), del, list);
                 }
             }
             catch (Exception)
