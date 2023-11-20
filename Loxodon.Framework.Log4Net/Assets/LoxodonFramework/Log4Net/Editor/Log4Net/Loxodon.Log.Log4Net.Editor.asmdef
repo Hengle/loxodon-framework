@@ -1,0 +1,19 @@
+{
+    "name": "Loxodon.Log.Log4Net.Editor",
+    "references": [
+        "Loxodon.Log",
+        "Loxodon.Log.Log4Net"
+    ],
+    "optionalUnityReferences": [],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [
+        "log4net.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": []
+}

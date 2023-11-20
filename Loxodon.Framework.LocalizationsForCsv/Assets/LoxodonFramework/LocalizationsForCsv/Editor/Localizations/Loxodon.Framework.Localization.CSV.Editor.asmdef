@@ -1,0 +1,19 @@
+{
+    "name": "Loxodon.Framework.Localization.CSV.Editor",
+    "references": [
+        "Loxodon.Log",
+        "Loxodon.Framework"
+    ],
+    "optionalUnityReferences": [],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [
+        "CsvHelper.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": []
+}

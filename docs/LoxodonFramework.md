@@ -1,11 +1,18 @@
-
+<!--
+---
+puppeteer:
+    landscape: false
+    format: "A3"
+    timeout: 3000 # <= 特殊设置，意味着等待（waitFor） 3000 毫秒
+---
+-->
 ![](images/icon.png)
 # Loxodon Framework
 
-*MVVM Framework for Unity3D(C# & XLua)*
+*MVVM Framework for Unity3D(C# & XLua & ILRuntime)*
 
 *开发者 Clark*
-*Version 1.9.7*
+*Version 2.0.0*
 
 <div style="page-break-after: always;"></div>
 
@@ -16,13 +23,18 @@
 <!-- code_chunk_output -->
 
 - [概述](#概述)
-- [下载](#下载)
+- [安装](#安装)
+  - [1.x.x版本升级到2.0注意事项](#1xx版本升级到20注意事项)
+  - [使用 OpenUPM 安装(推荐)](#使用-openupm-安装推荐)
+  - [修改Packages/manifest.json文件安装](#修改packagesmanifestjson文件安装)
+  - [通过git URL安装](#通过git-url安装)
+  - [通过 *.unitypackage 文件安装](#通过-unitypackage-文件安装)
+  - [导入示例](#导入示例)
 - [官方插件（可选）](#官方插件可选)
 - [Lua插件安装（可选）](#lua插件安装可选)
   - [安装XLua](#安装xlua)
-  - [配置宏定义](#配置宏定义)
   - [导入Lua插件](#导入lua插件)
-  - [查看示例](#查看示例)
+  - [导入示例](#导入示例-1)
 - [快速入门](#快速入门)
   - [C# 示例](#c-示例)
   - [Lua 示例](#lua-示例)
@@ -62,6 +74,12 @@
     - [AsyncTask](#asynctask)
     - [ProgressTask](#progresstask)
     - [CoroutineTask](#coroutinetask)
+  - [Async & Await](#async-await)
+    - [C# 的 async & await](#c-的-async-await)
+    - [Task转Unity协程](#task转unity协程)
+    - [Lua的async & await](#lua的async-await)
+    - [C# 调用Lua的async函数](#c-调用lua的async函数)
+    - [Lua的try / catch / finally](#lua的try-catch-finally)
   - [线程/协程执行器](#线程协程执行器)
     - [执行器(Executors)](#执行器executors)
     - [定时任务执行器(IScheduledExecutor)](#定时任务执行器ischeduledexecutor)
@@ -109,25 +127,29 @@
 
 ## 概述
 
-**要求Unity 5.6.0或者更高版本**
+**要求Unity 2018.4 或者更高版本**
 
 LoxodonFramework是一个轻量级的MVVM(Model-View-ViewModel)框架，它是专门为Unity3D游戏开发设计的，参考了WPF和Android的MVVM设计，它提供了视图和视图模型的数据绑定、本地化、一个简单的服务容器、配置文件组件、线程工具组件、应用上下文和玩家上下文，异步线程和协程的任务组件等基本组件，同时还提供了一个UI视图的框架。所有代码都基于面向对象面向接口的思路设计，几乎所有功能都可以自定义。而且在数据绑定部分进行了性能优化，在支持JIT的平台上使用的是委托的方式绑定，在不支持JIT的平台，默认使用的是反射，但是可以通过注入委托函数的方式来优化！
 
 本框架使用C#语言开发，同时也支持使用XLua来开发，XLua插件是一个可选项，如果项目需要热更新，那么只要安装了XLua插件，则可以完全使用Lua来开发游戏。
 
-这个插件兼容 MacOSX,Windows,Linux,UWP,IOS and Android等等，并且完全开源。
+这个插件兼容 MacOSX,Windows,Linux,UWP,WebGL,IOS and Android等等，并且完全开源。
 
 **已测试的平台：**  
 
-- **PC/Mac/Linux**  (.Net2.0 subset; .Net2.0; .Net4.x; .Net Standard 2.0; IL2CPP)  
-- **IOS**  (.Net2.0 subset; .Net2.0; .Net4.x; .Net Standard 2.0; IL2CPP)  
-- **Android**  (.Net2.0 subset; .Net2.0; .Net4.x; .Net Standard 2.0; IL2CPP)  
-- **UWP(window10)** (.Net4.x; .Net Standard 2.0; IL2CPP)  
+- **PC/Mac/Linux**  (.Net4.x; .Net Standard 2.0; IL2CPP)  
+- **IOS**  (.Net4.x; .Net Standard 2.0; IL2CPP)  
+- **Android**  (.Net4.x; .Net Standard 2.0; IL2CPP)  
+- **UWP(window10)** (.Net4.x; .Net Standard 2.0; IL2CPP)
+- **WebGL**  (.Net4.x; .Net Standard 2.0; IL2CPP)
 
 **关键特性**
 
 - 支持多平台，高扩展性，面向接口开发;
-- 支持C#和Lua开发;
+- 支持UGUI和FairyGUI;
+- 支持XLua，可以完全使用Lua脚本开发（可选）;  
+- 支持async&await (C#和Lua都支持);
+- Lua支持了try&catch&finally;
 - 支持线程和协程的异步结果和异步任务，采用Future/Promise设计模式;
 - 提供了多线程组件，线程切换组件和定时执行器;
 - 提供了一个消息系统，支持订阅和发布;
@@ -152,37 +174,145 @@ LoxodonFramework是一个轻量级的MVVM(Model-View-ViewModel)框架，它是�
     - 支持类型转换器，可以将图片名称转换为图集中的Sprite;
     - 可以自定义扩展更多的绑定类型;
 
-## 下载
+## 安装
 
-- [Unity3d官方商店下载](https://www.assetstore.unity3d.com/#!/content/77446)
-- [Github下载](https://github.com/cocowolf/loxodon-framework/releases)
+自Loxodon.Framework 2.0版本开始，保留了原有的 .unitypackage包发布方式，同时添加了UPM发布方式，此版本要求Unity 2018.4.2及以上版本，框架的目录结构和API都进行了一些调整，同时引入了async/await、Task等新特性，升级前请先查看下文的升级注意事项。
+
+**安装注意：在中国区下载的Unity版本屏蔽了第三方仓库，会导致UPM包安装失败，咨询了Unity中国相关人员说是马上会放开，如果UPM方式安装失败请使用.unitypackage文件安装或者使用非中国区的Unity版本**
+
+### 1.x.x版本升级到2.0注意事项
+
+**从1.x.x版本升级到2.0版本前，请先删除老版本的所有文件，按下面的安装步骤安装新版本。2.0版本的教程和示例代码默认不会自动导入，如需要请手动导入到项目中。**
+
+**Loxodon.Framework.XLua和Loxodon.Framework.Bundle因为依赖问题仍然使用传统方式发布**
+
+**不兼容的改变：**
+- **修改了IUIViewLocator接口以及实现，如果继承了此接口的自定义实现需要调整。**
+- **修改了本地化模块的IDataProvider接口及实现，如果没有自定义类，不会有影响。**
+- **IAsyncTask和IProgressTask有用到多线程,在WebGL平台不支持，2.0版本后建议不再使用，框架中用到了它们的地方都改为IAsyncResult和IProgressResult。**
+- **新的API使用了async/await和Task，不再支持 .net 2.0**
+- **修改了Window、WindowManager等几个类的函数，改IAsyncTask为IAsyncResult**
+
+### 使用 OpenUPM 安装(推荐)
+
+[OpenUPM](https://openupm.com/) 是一个开源的UPM包仓库，它支持发布第三方的UPM包，它能够自动管理包的依赖关系，推荐使用它安装本框架.
+
+通过openupm命令安装包,要求[nodejs](https://nodejs.org/en/download/) and openupm-cli客户端的支持，如果没有安装请先安装nodejs和open-cli。
+
+    # 使用npm命令安装openupm-cli，如果已经安装请忽略.
+    npm install -g openupm-cli
+
+    #切换当前目录到项目的根目录
+    cd F:/workspace/New Unity Project
+
+    #安装 loxodon-framework
+    openupm add com.vovgou.loxodon-framework
+
+### 修改Packages/manifest.json文件安装
+
+通过修改manifest.json文件安装，不需要安装nodejs和openupm-cli客户端。在Unity项目根目录下找到Packages/manifest.json文件，在文件的scopedRegistries（没有可以自己添加）节点下添加第三方仓库package.openupm.com的配置，同时在dependencies节点下添加com.vovgou.loxodon-framework的配置，保存后切换到Unity窗口即可完成安装。
+
+    {
+      "dependencies": {
+        ...
+        "com.unity.modules.xr": "1.0.0",
+        "com.vovgou.loxodon-framework": "2.0.0-preview"
+      },
+      "scopedRegistries": [
+        {
+          "name": "package.openupm.com",
+          "url": "https://package.openupm.com",
+          "scopes": [
+            "com.vovgou.loxodon-framework",
+            "com.openupm"
+          ]
+        }
+      ]
+    }
+
+
+### 通过git URL安装
+
+Unity 2019.3.4f1及以上版本支持使用git URL安装. 如下图添加 https://github.com/vovgou/loxodon-framework.git?path=Loxodon.Framework/Assets/LoxodonFramework 地址到UPM管理器，耐性等待一段时间，下载完成后即安装成功。
+
+![](images/install_via_git.png)
+
+### 通过 *.unitypackage 文件安装
+
+从以下地址下载 [Loxodon.Framework2.x.x.unitypackage](https://github.com/vovgou/loxodon-framework/releases) 后,导入到你的项目中即完成安装.
+
+- [AssetStore](https://assetstore.unity.com/packages/tools/gui/loxodon-framework-77446)
+- [Releases](https://github.com/vovgou/loxodon-framework/releases)
+
+
+### 导入示例
+
+ - Unity 2019 及以上版本可以通过Package Manager导入示例
+
+   打开包管理器，找到Import into project 按钮点击，导入示例到项目中。
+
+   ![](docs/images/install_examples.png)
+
+ - Unity 2018 版本导入示例
+
+   在Packages/Loxodon Framework/Package Resources/ 目录中找到Examples.unitypackage和Tutorials.unitypackage，双击导入到项目。
 
 ## 官方插件（可选）
 
-- [Loxodon Framework Localization For CSV](https://github.com/cocowolf/loxodon-framework-localization-for-csv)
+- [Loxodon Framework XLua](https://github.com/vovgou/loxodon-framework?path=Loxodon.Framework.XLua)
+
+    Loxodon.Framework框架的XLua插件，它是一个lua的MVVM框架，支持lua和c#混合编程或者也可以完全使用lua来编写您的整个游戏。安装步骤详见下一章节或者查看[Loxodon.Framework.XLua的文档](https://github.com/vovgou/loxodon-framework?path=Loxodon.Framework.XLua)    
+
+- [Loxodon Framework Localization For CSV](https://github.com/vovgou/loxodon-framework?path=Loxodon.Framework.LocalizationsForCsv)
 
     支持本地化文件格式为csv文件格式，要求 Unity2018.4 以上版本.
-
-- [Loxodon Framework XLua](https://github.com/cocowolf/loxodon-framework-xlua)
-
-    Loxodon.Framework框架的XLua插件，它是一个lua的MVVM框架，支持lua和c#混合编程或者也可以完全使用lua来编写您的整个游戏。安装步骤详见下一章节或者查看[Loxodon.Framework.XLua的文档](https://github.com/cocowolf/loxodon-framework-xlua)    
 
 - [Loxodon Framework Bundle](http://u3d.as/NkT)
 
     Loxodon.Framework.Bundle 是AssetBundle加载和管理的工具，也是一个AssetBundle资源冗余分析工具。它能够自动管理AssetBundle之间复杂的依赖关系，它通过引用计数来维护AssetBundle之间的依赖。你既可以预加载一个AssetBundle，自己管理它的释放，也可以直接通过异步的资源加载函数直接加载资源，资源加载函数会自动去查找资源所在的AB包，自动加载AB，使用完后又会自动释放AB。 它还支持弱缓存，如果对象模板已经在缓存中，则不需要重新去打开AB。它支持多种加载方式，WWW加载，UnityWebRequest加载，File方式的加载等等（在Unity5.6以上版本，请不要使用WWW加载器，它会产生内存峰值）。它提供了一个AssetBundle的打包界面，支持加密AB包（只建议加密敏感资源，因为会影响性能）。同时它也绕开了Unity3D早期版本的一些bug，比如多个协程并发加载同一个资源，在android系统会出错。它的冗余分析是通过解包AssetBundle进行的，这比在编辑器模式下分析的冗余更准确。
 
-    ![](images/bundle.jpg)
+    ![](images/bundle.png)
 
-- [Loxodon Framework Log4Net](http://u3d.as/Gmr)
+- [Loxodon Framework FairyGUI](https://github.com/vovgou/loxodon-framework?path=Loxodon.Framework.FairyGUI)
+
+    框架已支持FairyGUI控件的数据绑定，请下载FairyGUI-unity和Loxodon Framework FairyGUI，并导入项目中。
+
+    **下载：**
+    [FairyGUI-unity](https://github.com/fairygui/FairyGUI-unity)
+    [Loxodon Framework FairyGUI](https://github.com/vovgou/loxodon-framework/releases)  
+
+- [Loxodon Framework Log4Net](https://github.com/vovgou/loxodon-framework?path=Loxodon.Framework.Log4Net)
 
     支持使用Log4Net在Unity中打印日志的插件，支持在局域网中远程调试。
 
-    ![](images/log4net.jpg)
+    ![](images/log4net.png)
+
+- [Loxodon Framework Obfuscation](https://github.com/vovgou/loxodon-framework?path=Loxodon.Framework.Obfuscation)
+
+    数据类型内存混淆插件，支持ObfuscatedByte，ObfuscatedShort，ObfuscatedInt,ObfuscatedLong,ObfuscatedFloat,ObfuscatedDouble类型，防止内存修改器修改游戏数值，支持数值类型的所有运算符，与byte、short、int、long、float、double类型之间可以自动转换，使用时替换对应的数值类型即可。
+    Float和Double类型混淆时转为int和long类型进行与或运算，确保不会丢失精度，类型转换时使用unsafe代码，兼顾转换性能。
+
+    **注意：要求Unity2018以上版本，请开启"Allow unsafe Code"**
+
+    ![](docs/images/obfuscation_unsafe.png)
+
+    **使用示例：**
+
+       ObfuscatedInt  length = 200;
+       ObfuscatedFloat scale = 20.5f;
+       int offset = 30;
+
+       float value = (length * scale) + offset;
+
+
+- [Loxodon Framework Addressable](https://github.com/vovgou/loxodon-framework?path=Loxodon.Framework.Addressable)
+
+    有关Addressable Asset System功能的扩展与支持。
 
 
 ## Lua插件安装（可选）
 
-在本框架中，对于Lua语言的支持是通过插件扩展的方式来支持，它依赖腾讯的XLua项目和Loxodon.Framework.XLua插件，在项目的LoxodonFramework/Docs/XLua目录中可以找到Loxodon.Framework.XLua的插件，它是可选的，只有需要热更新并且使用Lua语言开发的项目才需要安装它。具体安装步骤如下，为避免出错，请严格按以下步骤安装。
+在本框架中，对于Lua语言的支持是通过插件扩展的方式来支持，它依赖腾讯的XLua项目和Loxodon.Framework框架，从Github下载[Loxodon.Framework.XLua.unitypackage](https://github.com/vovgou/loxodon-framework/releases)，导入你的项目。它是可选的，只有需要热更新并且使用Lua语言开发的项目才需要安装它。具体安装步骤如下。
 
 ### 安装XLua
 从Xlua的Github仓库下载最新版的XLua，可以使用源码版本Source code.zip或者xlua_v2.x.xx.zip版本（建议使用xlua_v2.x.xx.zip版本，避免和XLua示例类名冲突）。请将下载好的xlua解压缩，拷贝到当前项目中。
@@ -191,22 +321,17 @@ LoxodonFramework是一个轻量级的MVVM(Model-View-ViewModel)框架，它是�
 
 [XLua FAQ](https://github.com/Tencent/xLua/blob/master/Assets/XLua/Doc/faq.md)
 
-[XLua下载](https://github.com/Tencent/xLua/releases "xlua")
+[XLua下载](https://github.com/Tencent/xLua/releases)
 
-![](images/xlua_2.1.14.png)
-
-### 配置宏定义
-配置Unity3D项目Player Setting/Other Settings/Scripting Define Symbols，添加XLUA的宏定义，为避免将来切换平台时出错，最好将PC、Android、iOS等平台的都配上。
-
-![](images/ScriptingDefineSymbols.png)
+![](images/xlua_2.1.15.png)
 
 ### 导入Lua插件
-在LoxodonFramework/Docs/XLua/目录中，找到Loxodon.Framework.XLua.unitypackage文件，双击导入项目。
+从Github下载[Loxodon.Framework.XLua.unitypackage](https://github.com/vovgou/loxodon-framework/releases)文件，双击导入项目。
 
 如果出现编译错误，请检查是否导入了XLua的Examples目录，这个目录下的InvokeLua.cs文件定义了PropertyChangedEventArgs类，因没有使用命名空间，会导致类名冲突，请删除XLua目录下的Examples文件夹或者给InvokeLua.cs文件中的PropertyChangedEventArgs类添加上命名空间。
 
-### 查看示例
-打开LoxodonFramework/Lua/Examples目录，查看示例。
+### 导入示例
+在文件夹LoxodonFramework/XLua/PackageResources/目录下找到Examples.unitypackage 文件，双击导入项目。
 
 ## 快速入门
 
@@ -782,7 +907,7 @@ Perference除了扩展以上功能外，我还扩展了配置的作用域，如�
     BinaryFilePreferencesFactory factory = new BinaryFilePreferencesFactory(serializer, encryptor);
     Preferences.Register(factory);
 
-更多的示例请查看教程 [Basic Tutorials](https://github.com/cocowolf/loxodon-framework/tree/master/Assets/LoxodonFramework/Tutorials)
+更多的示例请查看教程 Basic Tutorials.unity
 
 ### 配置文件（Properties文件）
 
@@ -932,7 +1057,7 @@ Properties文件格式如下，以key = value 的方式配置所有内容，key�
 ![](images/LocalizationSource2.png)
 
 - 本地化数据源脚本方式(LocalizationSourceBehaviour)
-通过本地化数据源脚本挂在GameObject对象上，可以直接存储在Prefab中或场景中，它无法按语言分别存储，所有支持语言的本地化资源都应该配置在同一个脚本文件中。LocalizationSourceBehaviour脚本中自带了DataProvider，当脚本运行会自动加载数据，当对象销毁时又会自动卸载数据。这种方式特别适合与UIView配合使用，当UIView创建时自动加载本地化数据，当UIView关闭时又会释放本地化数据。与Asset文件格式相比，它的优点是可以像一个Unity对象一样使用，拖入场景或者prefab中即可，不需要写脚本来管理它，它的缺点是所配置多个语言版本的数据都会加载到内存中，会占用更多的内存。[示例 Localization Source Tutorials](https://github.com/cocowolf/loxodon-framework/tree/master/Assets/LoxodonFramework/Tutorials/)
+通过本地化数据源脚本挂在GameObject对象上，可以直接存储在Prefab中或场景中，它无法按语言分别存储，所有支持语言的本地化资源都应该配置在同一个脚本文件中。LocalizationSourceBehaviour脚本中自带了DataProvider，当脚本运行会自动加载数据，当对象销毁时又会自动卸载数据。这种方式特别适合与UIView配合使用，当UIView创建时自动加载本地化数据，当UIView关闭时又会释放本地化数据。与Asset文件格式相比，它的优点是可以像一个Unity对象一样使用，拖入场景或者prefab中即可，不需要写脚本来管理它，它的缺点是所配置多个语言版本的数据都会加载到内存中，会占用更多的内存。
 ![](images/LocalizationSource3.png)
 ![](images/LocalizationSource4.png)
 
@@ -1136,7 +1261,7 @@ XML 格式配置如下:
 #### 数据提供器(IDataProvider)
 
 框架的本地化组件支持同时使用多种数据格式来配置本地化资源，它们有不同的文件格式，不同的目录结构，甚至有不同的文件查找规则，无论情况多么复杂，都可以通过数据提供器(IDataProvider)和文档解析器(IDocumentParser)来统一它们，通过数据提供器加载数据，通过文档解析器解析资源文件，在框架中我提供了一些默认的数据加载器，可以从Resources目录或者AssetBundle中根据前文中提到的目录规则来加载本地化数据。如果需要支持更多的数据格式，或者要定制文件查找规则和加载方式，请参考我的代码实现自定义的数据提供器。
-以下的代码是使用默认的数据提供器从Resources/LocalizationTutorials/（教程本地化资源的根目录，目录结构如下图）目录中加载xml和asset格式的文件，xml格式的文件使用DefaultDataProvider加载，它会加载当前语言的所有xml文件，文本文件占用较少的内存，不要释放它们。asset格式的文件使用DefaultLocalizationSourceDataProvider加载，它配置了具体的asset文件名称，它只会加载名字列表中的文件，asset文件中配置图片声音等多媒体资源，在使用完毕请删除DefaultLocalizationSourceDataProvider卸载资源。
+以下的代码是使用默认的数据提供器从Resources/LocalizationTutorials/（教程本地化资源的根目录，目录结构如下图）目录中加载xml和asset格式的文件，xml格式的文件使用DefaultDataProvider加载，它会加载目录中当前语言的所有xml文件，文本文件占用较少的内存，不需要释放它们。asset格式的文件使用DefaultLocalizationSourceDataProvider加载，它的构造函数需要提供具体的asset文件名列表，它只会加载名字列表中的文件，asset文件中配置图片声音等多媒体资源，会占用较多的内存，在使用完毕请从Localization中删除DefaultLocalizationSourceDataProvider来卸载本地化资源。
 ![](images/Localization_dir2.png)
 
     var localization = Localization.Current;
@@ -1146,7 +1271,7 @@ XML 格式配置如下:
     //文本资源不占用太多内存，默认加载当前语言的所有xml文件   
     localization.AddDataProvider(new DefaultDataProvider("LocalizationTutorials", new XmlDocumentParser()));
 
-    //添加一个Asset数据的加载器，从Resources/LocalizationExamples 目录中加载名为login.asset的资源
+    //添加一个Asset数据的加载器，从Resources/LocalizationExamples 目录中加载文件名为LocalizationModule.asset的资源
     //Asset类型的资源请在使用前加载，并且在不需要的时候释放它们
     var provider = new DefaultLocalizationSourceDataProvider("LocalizationTutorials","LocalizationModule.asset");
     localization.AddDataProvider(provider);
@@ -1255,13 +1380,13 @@ XML 格式配置如下:
     </resources>
 
 
-更多的示例请查看教程 [Localization Tutorials](https://github.com/cocowolf/loxodon-framework/tree/master/Assets/LoxodonFramework/Tutorials)
+更多的示例请查看教程 Localization Tutorials.unity
 
 #### 支持CSV格式的本地化插件
 
 如果习惯使用Excel的朋友可以下载我的CSV插件，它支持读取CSV文件格式的本地化配置，但是要求Unity版本在2018以上，支持.net 4.x或者.net standard 2.0。
 
-下载地址：[Loxodon Framework Localization For CSV](https://github.com/cocowolf/loxodon-framework-localization-for-csv/releases)
+下载地址：[Loxodon Framework Localization For CSV](https://github.com/vovgou/loxodon-framework/releases)
 
 **配置文件格式如下**
 
@@ -1279,9 +1404,13 @@ XML 格式配置如下:
 
 ![](images/csv.png)
 
+**文件编码**
+
+ 如果文件中包含中文，请确保CSV文件使用UTF-8编码，否则在文件转换时可能出现乱码，使用WPS从excel文件导出为csv文件时，请重点检查编码格式是否为UTF-8编码(可以使用记事本或者EditPlus查看)。
+
 **支持类型和数组的表示**
 
-CSV配置同样支持上一节中XML配置所支持的所有基本数据类型，唯一不同的是CSV文件中使用逗号分隔符来支持数组类型，如下表所示。
+CSV配置同样支持上一节中XML配置所支持的所有基本数据类型，支持单元格内换行符，唯一不同的是CSV文件中使用逗号分隔符来支持数组类型，如下表所示。
 
 **注意：数组使用半角逗号分隔，在半角的双引号、单引号、小括号()、中括号[]、大括号{}、尖括号<>之间的逗号会被忽略，如数组的字符串中有逗号，请使用双引号或者单引号将字符串引起来,否则在数组分隔时会出错**
 
@@ -1304,11 +1433,21 @@ XML的配置文件和CSV的配置文件可以相互转换，但是对于数组�
 
 ![](images/xml2csv2.png)
 
+**文件示例**
+
+CSV源文件
+
+![](images/csv_source.png)
+
+转换为XML文件格式后的中文本地化文件（魔兽世界、星际争霸、帝国时代后面的换行符仍然存在，只是不可见）。
+
+![](images/csv2xml.png)
+
 ### 日志系统
 
 框架提供了一个可分级的日志系统，它支持ALL、DEBUG、INFO、WARN、ERROR、FATAL等多个级别，在项目在开发阶段和发布上线可以使用不同的日志打印级别。
 
-日志系统我提供了一个Unity3D的Debug版本的实现，它基本满足了一般的开发和调试需求，但是如果需要更强的日志功能，比如打印日志到文件系统，移动终端通过局域网将日志打印到电脑等，可以下载我的日志插件[Loxodon.Framework.Log4Net](https://assetstore.unity.com/packages/tools/utilities/loxodon-framework-log4net-79440)，它是一个用Log4Net实现的插件，功能非常强大。
+日志系统我提供了一个Unity3D的Debug版本的实现，它基本满足了一般的开发和调试需求，但是如果需要更强的日志功能，比如打印日志到文件系统，移动终端通过局域网将日志打印到电脑等，可以下载我的日志插件[Loxodon.Framework.Log4Net](https://github.com/vovgou/loxodon-framework.git?path=Loxodon.Framework.Log4Net)，它是一个用Log4Net实现的插件，功能非常强大。
 
 默认日志系统的使用示例
 
@@ -1662,7 +1801,248 @@ ProgressTask与AsyncTask功能类似，只是增加了任务进度，同样Progr
 
     }
 
-更多的示例请查看教程 [Basic Tutorials](https://github.com/cocowolf/loxodon-framework/tree/master/Assets/LoxodonFramework/Tutorials)
+更多的示例请查看教程 Basic Tutorials.unity
+
+### Async & Await
+
+#### C# 的 async & await
+
+Unity2017发布后，使用 .Net 4.x 或者 .Net Standard 2.0库，已经可以使用C#的新特性async和await。框架为IEnumerator、YieldInstruction、CustomYieldInstruction、AsyncOperation、IAsyncResult、CoroutineTask等等扩展了GetAwaiter()函数，以支持async-await特性。同时增加WaitForMainThread和WaitForBackgroundThread类用来切换代码片段的工作线程。
+
+示例一，async和await使用方式
+
+    public class AsyncAndAwaitExample : MonoBehaviour
+    {
+        async void Start()
+        {
+            await new WaitForSeconds(2f);
+            Debug.Log("WaitForSeconds  End");
+
+            await Task.Delay(1000);
+            Debug.Log("Delay  End");
+
+            UnityWebRequest www = UnityWebRequest.Get("http://www.baidu.com");
+            await www.SendWebRequest();
+            Debug.Log(www.downloadHandler.text);
+
+            int result = await Calculate();
+            Debug.LogFormat("Calculate Result = {0} Calculate Task End", result);
+
+            await new WaitForSecondsRealtime(1f);
+            Debug.Log("WaitForSecondsRealtime  End");
+
+            await DoTask(5);
+            Debug.Log("DoTask End");
+        }
+
+        IAsyncResult<int> Calculate()
+        {
+            return Executors.RunAsync<int>(() =>
+            {
+                Debug.LogFormat("Calculate Task ThreadId:{0}", Thread.CurrentThread.ManagedThreadId);
+                int total = 0;
+                for (int i = 0; i < 20; i++)
+                {
+                    total += i;
+                    try
+                    {
+                        Thread.Sleep(100);
+                    }
+                    catch (Exception) { }
+                }
+                return total;
+            });
+        }
+
+        IEnumerator DoTask(int n)
+        {
+            yield return new WaitForSeconds(1f);
+
+            for (int i = 0; i < n; i++)
+            {
+                yield return null;
+            }
+        }
+    }
+
+示例二，在函数中，主线程和后台线程的可以通过WaitForBackgroundThread和WaitForMainThread切换，不同的代码片段可以执行在不同的线程中。
+
+    using Loxodon.Framework.Asynchronous;//扩展函数GetAwaiter()所在命名空间
+    using System.Threading;
+    using System.Threading.Tasks;
+    public class AsyncAndAwaitSwitchThreadsExample : MonoBehaviour
+    {
+        async void Start()
+        {
+            //Unity Thread
+            Debug.LogFormat("1. ThreadID:{0}",Thread.CurrentThread.ManagedThreadId);
+
+            await new WaitForBackgroundThread();
+
+            //Background Thread
+            Debug.LogFormat("2.After the WaitForBackgroundThread.ThreadID:{0}", Thread.CurrentThread.ManagedThreadId);
+
+            await new WaitForMainThread();
+
+            //Unity Thread
+            Debug.LogFormat("3.After the WaitForMainThread.ThreadID:{0}", Thread.CurrentThread.ManagedThreadId);
+
+            await Task.Delay(3000).ConfigureAwait(false);
+
+            //Background Thread
+            Debug.LogFormat("4.After the Task.Delay.ThreadID:{0}", Thread.CurrentThread.ManagedThreadId);
+
+            await new WaitForSeconds(1f);
+
+            //Unity Thread
+            Debug.LogFormat("5.After the WaitForSeconds.ThreadID:{0}", Thread.CurrentThread.ManagedThreadId);
+        }
+    }
+
+更多的示例请查看教程 Async & Await Tutorials.unity
+
+#### Task转Unity协程
+
+框架为Task扩展了AsCoroutine()函数，支持Task转为Unity的协程，请看示例。
+
+    using Loxodon.Framework.Asynchronous;//扩展函数AsCoroutine()所在命名空间
+    public class TaskToCoroutineExample : MonoBehaviour
+    {
+        IEnumerator Start()
+        {
+            Task task = Task.Run(() =>
+            {
+                for (int i = 0; i < 5; i++)
+                {
+                    try
+                    {
+                        Thread.Sleep(200);
+                    }
+                    catch (Exception) { }
+
+                    Debug.LogFormat("Task ThreadId:{0}", Thread.CurrentThread.ManagedThreadId);
+                }
+            });
+
+            yield return task.AsCoroutine();
+            Debug.LogFormat("Task End,Current Thread ID:{0}", Thread.CurrentThread.ManagedThreadId);
+
+            yield return Task.Delay(1000).AsCoroutine();
+            Debug.LogFormat("Delay End");
+        }
+    }
+
+#### Lua的async & await
+
+为了保持Lua开发与C#开发同步,在Lua中我也同样增加了async & await的支持，并且确保C#和Lua可以相互调用。
+
+Lua中async是一个函数，async只能有一个输入参数，而且必须是一个函数，async将输入的函数包装为一个lua协程，返回值是一个被包装后的函数。async的输入函数可以是有参数的，也可以是无参数的函数，函数可以有一个或者多个返回值，也可以无返回值。
+
+await同样也是一个函数，await函数的输入参数必须是一个AsyncTask对象，或者是任何一个实现了GetAwaiter()函数的异步结果，不管是C#的对象还是lua对象都支持，所以无论是C#的Task、UniTask还是Unity的异步结果，都可以作为await的输入参数。await函数会监听异步结果的回调，同时挂起当前协程，当异步任务完成，回调后会触发协程继续执行。await同样支持无返回值，单个返回值或者多个返回值的异步结果。
+
+async & await函数定义在AsyncTask模块中，只要在lua文件中通过require导入AsyncTask模块，即可使用
+
+下面请看示例，将下面的lua类挂在LuaBehaviour上，通过LuaBehaviour自动调用start函数。
+
+    require("framework.System")     
+    local AsyncTask = require("framework.AsyncTask") --导入AsyncTask模块，同时导入了 async、await、try 函数
+
+    local M=class("Example",target)    
+
+    --定义position函数，输入参数是xyz，返回AsyncTask异步对象
+    --async支持多个返回值的函数
+    M.position = async(function(x,y,z)
+		return x/1000.0,y/1000.0,z/1000.0
+	end)
+
+    M.start = async(function(self)		
+		await(AsyncTask.Delay(1000)) --Delay 1000 milliseconds
+
+		local x,y,z = await(M.position(1200,500,240)) --异步调用position函数，返回x,y,z
+
+		printf("x=%s y=%s z=%s",x,y,z)		
+
+		--异步调用Resources.LoadAsync
+		local goTemplate = await(CS.UnityEngine.Resources.LoadAsync("Prefabs/Cube",typeof(CS.UnityEngine.GameObject)))
+
+		local go = GameObject.Instantiate(goTemplate)
+
+		go.transform.localPosition = CS.UnityEngine.Vector3.zero;
+	end)
+
+#### C# 调用Lua的async函数
+
+在C#运行时，我实现了ILuaTask接口，在C#方可以很方便的将AsyncTask对象自动转换为ILuaTask对象，方便C#调用。
+
+如上示例中的M.start函数，执行start()将会返回一个AsyncTask的lua对象，请看下面的C#调用代码。
+
+    public class LuaBehaviour : MonoBehaviour, ILuaExtendable
+    {
+        protected LuaTable metatable;
+        protected Func<MonoBehaviour, ILuaTask> onStart;
+
+        protected virtual void Awake()
+        {
+            ...
+
+            metatable = (LuaTable)result[0];
+            //调用lua的start函数，此函数可以是async包装的异步函数，也可以是普通函数
+            onStart = metatable.Get<Func<MonoBehaviour, ILuaTask>>("start");
+        }
+
+        protected virtual async void Start()
+        {
+            if (onStart != null)
+            {
+                //start是async包装的异步函数则会返回ILuaTask对象，否则返回null
+                ILuaTask task = onStart(this);
+                if (task != null)
+                    await task;
+            }
+        }
+    }
+
+#### Lua的try / catch / finally
+
+为配合async和await的使用，使用try函数包装了lua的xpcall函数，以方便在lua函数中捕获异常。
+
+try函数的输入参数一个lua表，起结构如下，t[0]是主函数，t.catch是catch函数，t.finally是finally函数
+
+	{
+		function()
+			--这是主函数
+		end,
+		catch=function(e)
+			--这是catch函数
+		end,
+		finally =function()
+			--这是finally函数
+		end			
+	}
+
+try/catch的示例
+
+    local position = async(function(x,y,z)
+
+        --try 实际是一个函数，如果需要返回值则在try之前加return，否则不需要加return
+
+		return try{
+			function()
+				--这是主函数
+				error("This a test,throw an exception")				
+				return x/1000.0,y/1000.0,z/1000.0
+			end,
+			catch=function(e)
+				--这是catch函数
+				printf("Catch exception:%s",e)
+				return 0,0,0 --发生异常，返回默认值
+			end,
+			finally =function()
+				--这是finally函数
+				print("Execute the finally block")
+			end			
+		}		
+	end)
 
 ### 线程/协程执行器
 在Unity3d逻辑脚本的开发中，是不支持多线程的，所有的UnityEngine.Object对象，都只能在主线程中访问和修改，但是在游戏开发过程中，我们很难避免会使用到多线程编程，比如通过Socket连接从网络上接受数据，通过多线程下载资源，一些纯计CPU计算的逻辑切入到后台线程去运算等等。这里就会面临一个线程切换的问题。所以在Loxodon.Framework框架中，我设计了一个线程和协程的执行器配合前文中的任务结果来使用，它能够很方便的将任务切换到主线程执行，也能很方便的开启一个后台线程任务。
@@ -1770,7 +2150,7 @@ InterceptableEnumerator支持条件语句块，可以在外部插入一个条件
         return enumerator;
     }
 
-更多的示例请查看教程 [Basic Tutorials](https://github.com/cocowolf/loxodon-framework/tree/master/Assets/LoxodonFramework/Tutorials)
+更多的示例请查看教程 Basic Tutorials.unity
 
 ### 消息系统(Messenger)
 
@@ -1822,7 +2202,7 @@ Messenger用于应用模块间的通讯，它提供了消息订阅和发布的�
         }
     }
 
-更多的示例请查看教程 [Basic Tutorials](https://github.com/cocowolf/loxodon-framework/tree/master/Assets/LoxodonFramework/Tutorials)
+更多的示例请查看教程 Basic Tutorials.unity
 
 ### 可观察的对象(Observables)
 
@@ -1900,7 +2280,7 @@ ObservableObject、ObservableList、ObservableDictionary，在MVVM框架的数�
         }
     }
 
-更多的示例请查看教程 [Basic Tutorials](https://github.com/cocowolf/loxodon-framework/tree/master/Assets/LoxodonFramework/Tutorials)
+更多的示例请查看教程 Basic Tutorials.unity
 
 ### 数据绑定(Databinding)
 
@@ -1983,7 +2363,7 @@ ObservableObject、ObservableList、ObservableDictionary，在MVVM框架的数�
     //通过视图模型Icon，修改精灵名称，通过spriteConverter转换为对应的Sprite，赋值到图片的sprite属性上。
     bindingSet.Bind(this.image).For(v => v.sprite).To(vm => vm.Icon).WithConversion("spriteConverter").OneWay();
 
-请查看示例 [ListView And Sprite Databinding Tutorials](https://github.com/cocowolf/loxodon-framework/tree/master/Assets/LoxodonFramework/Tutorials)
+请查看示例 ListView And Sprite Databinding Tutorials.unity
 
 #### 绑定类型
 
@@ -2077,17 +2457,17 @@ ObservableObject、ObservableList、ObservableDictionary，在MVVM框架的数�
 
 #### Command Parameter
 
-从事件到命令(ICommand)或方法的绑定支持自定义参数，使用Command Parameter可以为没有参数的UI事件添加一个自定义参数（如Button的Click事件），如果UI事件本身有参数则会被命令参数覆盖。使用Command Parameter可以很方便的将多个Button的Click事件绑定到视图模型的同一个函数OnClick(int buttonNo)上，请注意确保函数的参数类型和命令参数匹配，否则会导致错误。详情请参考下面的示例
+从事件到命令(ICommand)或方法的绑定支持自定义参数，使用Command Parameter可以为没有参数的UI事件添加一个自定义参数（如Button的Click事件），如果UI事件本身有参数则会被命令参数覆盖。使用Command Parameter可以很方便的将多个Button的Click事件绑定到视图模型的同一个函数OnClick(string buttonName)上，请注意确保函数的参数类型和命令参数匹配，否则会导致错误。命令参数在版本v2.5.2之前只支持常量作为命令参数，从v2.5.2开始，支持使用拉姆达表达式做为命令参数。详情请参考下面的示例
 
-在示例中将一组Button按钮的Click事件绑定到视图模型的OnClick函数上，通过参数buttonNo可以知道当前按下了哪个按钮。
+在示例中将一组Button按钮的Click事件绑定到视图模型的OnClick函数上，通过参数buttonName可以知道当前按下了哪个按钮。
 
     public class ButtonGroupViewModel : ViewModelBase
     {
         private string text;
-        private readonly SimpleCommand<int> click;
+        private readonly SimpleCommand<string> click;
         public ButtonGroupViewModel()
         {
-            this.click = new SimpleCommand<int>(OnClick);
+            this.click = new SimpleCommand<string>(OnClick);
         }
 
         public string Text
@@ -2101,16 +2481,16 @@ ObservableObject、ObservableList、ObservableDictionary，在MVVM框架的数�
             get { return this.click; }
         }
 
-        public void OnClick(int buttonNo)
+        public void OnClick(string buttonName)
         {
-            Executors.RunOnCoroutineNoReturn(DoClick(buttonNo));
+            Executors.RunOnCoroutineNoReturn(DoClick(buttonName));
         }
 
-        private IEnumerator DoClick(int buttonNo)
+        private IEnumerator DoClick(string buttonName)
         {
             this.click.Enabled = false;
-            this.Text = string.Format("Click Button:{0}.Restore button status after one second", buttonNo);
-            Debug.LogFormat("Click Button:{0}", buttonNo);
+            this.Text = string.Format("Click Button:{0}.Restore button status after one second", buttonName);
+            Debug.LogFormat("Click Button:{0}", buttonName);
 
             //Restore button status after one second
             yield return new WaitForSeconds(1f);
@@ -2130,11 +2510,11 @@ ObservableObject、ObservableList、ObservableDictionary，在MVVM框架的数�
         /* databinding */
         BindingSet<DatabindingForButtonGroupExample, ButtonGroupViewModel> bindingSet;
         bindingSet = this.CreateBindingSet<DatabindingForButtonGroupExample, ButtonGroupViewModel>();
-        bindingSet.Bind(this.button1).For(v => v.onClick).To(vm => vm.Click).CommandParameter(1);
-        bindingSet.Bind(this.button2).For(v => v.onClick).To(vm => vm.Click).CommandParameter(2);
-        bindingSet.Bind(this.button3).For(v => v.onClick).To(vm => vm.Click).CommandParameter(3);
-        bindingSet.Bind(this.button4).For(v => v.onClick).To(vm => vm.Click).CommandParameter(4);
-        bindingSet.Bind(this.button5).For(v => v.onClick).To(vm => vm.Click).CommandParameter(5);
+        bindingSet.Bind(this.button1).For(v => v.onClick).To(vm => vm.Click).CommandParameter(()=>button1.name);
+        bindingSet.Bind(this.button2).For(v => v.onClick).To(vm => vm.Click).CommandParameter(()=>button2.name);
+        bindingSet.Bind(this.button3).For(v => v.onClick).To(vm => vm.Click).CommandParameter(()=>button3.name);
+        bindingSet.Bind(this.button4).For(v => v.onClick).To(vm => vm.Click).CommandParameter(()=>button4.name);
+        bindingSet.Bind(this.button5).For(v => v.onClick).To(vm => vm.Click).CommandParameter(()=>button5.name);
 
         bindingSet.Bind(this.text).For(v => v.text).To(vm => vm.Text).OneWay();
 
@@ -2160,7 +2540,7 @@ ObservableObject、ObservableList、ObservableDictionary，在MVVM框架的数�
 
 #### 注册属性和域的访问器
 
-在IOS平台不允许JIT编译，不允许动态生成代码，数据绑定功能访问对象的属性、域和方法时无法像其他平台一样通过动态生成委托来访问，只能通过反射来访问，众所周知反射的效率是很差的，所以我提供了静态注入访问器的功能来绕过反射。默认情况下，我已经创建了UGUI和Unity引擎的部分类的属性访问器，参考我的代码，你也可以将视图模型类的常用属性的访问器注册到类型代理中。
+包括IOS平台在内，无论是Mono还是IL2CPP，数据绑定功能访问对象的属性、域都通过动态生成委托来访问，方法调用因为IL2CPP不支持表达式树的编译，使用的是反射调用，Mono使用的是通过表达式树编译成委托的方式调用。对于常用的UI控件，也可以通过静态注入访问器的方式访问对象的属性和域。默认情况下，我已经创建了UGUI和Unity引擎的部分类的属性访问器，参考我的代码，你也可以将视图模型类的常用属性的访问器注册到类型代理中。
 
     public class UnityProxyRegister
     {
@@ -2495,7 +2875,45 @@ UGUI虽然为我们提供了丰富的UI控件库，但是在某些时候，仍�
 
 - **窗口类型**
 
-  窗口类型分为四种类型，全屏窗口（FULL），弹出窗口（POPUP），对话框窗口（DIALOG），进度条窗口（PROGRESS）。不同的窗口类型，在窗口打开和被遮挡时会有不同的表现。弹出窗口在被其他窗口覆盖时，会自动关闭。对话框窗口和进度窗口有最高的优先级，它会显示在最顶层，并且只允许打开一个，当有对话窗或者进度窗口显示时，如果打开其他窗口，其他窗口不会显示，只有当对话框或者进度窗关闭时才会显示出来，如果同时打开多个对话窗，对话窗口会排队处理，只有关闭前一个才会显示下一个。
+  窗口类型按不同的功能特征分为FULL、POPUP、QUEUED_POPUP、DIALOG、PROGRESS五种类型。
+
+    - 全屏窗口(FULL)
+
+        全屏窗口一般为全屏显示，它优先级较低。
+
+    - 弹出窗口(POPUP)
+
+        弹出窗口在被其他窗口覆盖时，会自动关闭，但是可以通过ITransition.Overlay()函数重写覆盖规则；
+
+            var window = ...
+            window.Show().Overlay((previous,current) =>
+            {
+                 if (previous == null || previous.WindowType == WindowType.FULL)
+                    return ActionType.None;
+
+                if (previous.WindowType == WindowType.POPUP)
+                    return ActionType.Dismiss;
+
+                return ActionType.None;
+            });
+
+       以上代码覆盖默认的规则，通过它可以控制前一个窗口的关闭和隐藏等。
+
+    - 系统对话窗(DIALOG)
+
+        系统对话窗和进度窗口有最高的优先级，在同一个窗口管理器中，它会显示在最顶层，并且只允许打开一个，当有对话窗或者进度窗口显示时，如果打开其他窗口，其他窗口不会显示，只有当系统对话框或者进度窗关闭时其它窗口才会显示出来，如果同时打开多个对话窗，对话窗口会排队处理，只有关闭前一个才会显示下一个；系统对话窗一般用来处理网络断开提示重连，或者退出游戏时提示用户确认等。
+
+    - 进度条对话窗(PROGRESS)
+
+        功能等同于系统对话窗，在显示进度条对话窗时使用。
+
+    - 队列弹窗(QUEUED_POPUP)
+
+        队列弹窗(QUEUED_POPUP)功能类似DIALOG类型，但是可以配置窗口优先级，在同一个窗口管理器，它只允许打开一个，当有其他的QUEUED_POPUP或者POPUP、FULL等窗口打开时，会排队等候，并且优先级高的QUEUED_POPUP窗口先打开，优先级低的后打开，其他窗口最后打开，队列弹窗(QUEUED_POPUP)优先级低于DIALOG和PROGRESS窗口，如果有DIALOG或者PROGRESS窗口打开时会被覆盖。
+
+        这种类型的窗口一般用来展示服务器推送的消息上，比如游戏启动时，服务器推送多个消息，打开公告牌，领取奖励等等，需要打开多个窗口显示时可以使用这种类型，并且对弹出窗口排序。
+
+    窗口类型设置如下图：
 
   ![](images/WindowType.png)  
 
@@ -2608,7 +3026,7 @@ UGUI虽然为我们提供了丰富的UI控件库，但是在某些时候，仍�
         }
     }
 
-请查看示例 [Interaction Tutorials](https://github.com/cocowolf/loxodon-framework/tree/master/Assets/LoxodonFramework/Tutorials)
+请查看示例 Interaction Tutorials.unity
 
 #### 交互行为(InteractionAction)
 
@@ -2631,7 +3049,7 @@ InteractionAction配合InteractionRequest配对使用，由交互请求发起交
     //绑定InteractionAction到InteractionRequest
     bindingSet.Bind().For(v => v.loadingInteractionAction).To(vm => vm.LoadingRequest);
 
-请查看示例 [Interaction Tutorials](https://github.com/cocowolf/loxodon-framework/tree/master/Assets/LoxodonFramework/Tutorials)
+请查看示例 Interaction Tutorials.unity
 
 #### 集合与列表视图的绑定
 在Unity3D游戏开发中，我们经常要使用到UGUI的ScrollRect控件，比如我们要展示一个装备列表，或者一个背包中的所有物品。那么我们可以使用数据绑定功能来自动更新列表中的内容吗，比如添加、删除、修改一个装备集合中的数据，装备列表视图会自动更新界面内容吗？ 答案是肯定的，使用ObservableList或者ObservableDictionary集合来存储装备信息，通过数据绑定集合到一个视图脚本上，就可以自动的更新装备列表的内容，只是这里的视图脚本需要我们自己实现，因为每个项目列表视图并不是标准化的，我无法提供一个通用的脚本来提供集合的绑定。
@@ -2980,7 +3398,7 @@ InteractionAction配合InteractionRequest配对使用，由交互请求发起交
         }
     }
 
-请查看示例 [ListView And Sprite Databinding Tutorials](https://github.com/cocowolf/loxodon-framework/tree/master/Assets/LoxodonFramework/Tutorials)
+请查看示例 ListView And Sprite Databinding Tutorials.unity
 
 #### 数据绑定与异步加载精灵
 在前文的示例中，我有使用到精灵的绑定，只是它是提前加载到内存中的。在这里我将讲讲如何通过数据绑定来异步加载一个精灵。与上一节中集合绑定类似，通过一个视图脚本就可以轻松实现精灵的异步加载。下面我们来看示例。
@@ -3105,7 +3523,7 @@ InteractionAction配合InteractionRequest配对使用，由交互请求发起交
         }
     }
 
-请查看示例 [Databinding for Asynchronous Loading Sprites Tutorials](https://github.com/cocowolf/loxodon-framework/tree/master/Assets/LoxodonFramework/Tutorials)
+请查看示例 Databinding for Asynchronous Loading Sprites Tutorials.unity
 
 ## Lua
 
@@ -3181,6 +3599,8 @@ Lua继承C#类Loxodon.Framework.Contexts.Context，新增GetName()函数，重�
 MonoBehaviour脚本无法被继承，但是它的实例可以被lua扩展，使用class函数，我们可以为它添加新的属性和方法，与C#类继承不同，class第二个参数是一个C#类的实例。请看lua示例中，C#脚本LuaLauncher的扩展代码。
 
 "target"对象是在C#脚本LuaLauncher中，在初始化lua脚本环境时将自己的实例注入到lua环境的，在本框架所有的扩展脚本中，统一使用"target"的变量名,请在游戏逻辑开发中遵循这一规则。
+
+**注意 Lua继承一个C#类或者Lua扩展了MonoBehaviour实例之后，在Lua运行时中，C#实例和Lua模块对应的实例是同一个对象，你拿到了MonoBehaviour的实例对象，不但可以访问所有MonoBehaviour中的函数和属性，同时也可以访问Lua脚本中扩展的函数和属性**
 
 C#代码，LuaLauncher脚本中初始化lua执行环境的部分。
 
@@ -3514,5 +3934,5 @@ XLua为我们提供了一个在lua中创建迭代器(IEnumerator)的函数util.c
 
 ## 联系方式
 邮箱: [yangpc.china@gmail.com](mailto:yangpc.china@gmail.com)   
-网站: [https://cocowolf.github.io/loxodon-framework/](https://cocowolf.github.io/loxodon-framework/)  
+网站: [https://vovgou.github.io/loxodon-framework/](https://vovgou.github.io/loxodon-framework/)  
 QQ群: 622321589 [![](images/qq_group.png)](https:////shang.qq.com/wpa/qunwpa?idkey=71c1e43c24900ee84aeffc76fb67c0bacddc3f62a516fe80eae6b9521f872c59)
